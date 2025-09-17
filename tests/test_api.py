@@ -13,3 +13,23 @@ def test_read_root():
 
     # Assert that the response JSON matches our expected output
     assert response.json() == {"message": "Welcome to the Job Queue Service!"}
+
+def test_submit_job():
+    # Define a sample job payload
+    job_payload = {
+        "job_type": "send_email",
+        "payload": {
+            "recipient_email": "test@example.com",
+            "subject": "Hello from FastAPI!",
+            "body": "This is a test email."
+        }
+    }
+
+    # Make a POST request to the root endpoint
+    response = client.post("/jobs/submit", json=job_payload)
+
+    # Assert that the response status code is 201 (Created)
+    assert response.status_code == 201
+
+    # Assert that the response JSON matches our expected output
+    assert response.json() == {"message": "Job received successfully", "job_type": "send_email"}
