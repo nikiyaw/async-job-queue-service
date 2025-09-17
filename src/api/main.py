@@ -1,6 +1,21 @@
 from fastapi import FastAPI, HTTPException, status
 from src.api.models import JobSubmission
 
+from sqlalchemy.orm import Session
+from src.api.database import SessionLocal, engine, Job, Base
+
+# This line ensures the tables are created when the app starts
+Base.metadata.create_all(bind=engine)
+
+# Dependency to get a database session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        
+
 app = FastAPI()
 
 @app.get("/")
