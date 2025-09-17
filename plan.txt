@@ -1,0 +1,95 @@
+Week 1: Setup & Core API
+Tasks
+Project Initialization: You'll start by setting up the project directory. We'll decide on a folder structure that promotes modularity and separation of concerns. A good structure might include src/api, src/workers, and tests/.
+
+Git & GitHub Actions: We'll initialize a Git repository. Then, we'll configure GitHub Actions to automate two key processes: running code linters (like flake8 for Python or ESLint for Node.js) to enforce a consistent coding style and running your test suite. This establishes a "clean code" culture from day one.
+
+API Framework Selection: We'll choose either FastAPI (Python) or Express (Node.js). FastAPI is excellent for its built-in data validation and performance, while Express is a very popular and flexible choice.
+
+Database Setup: You'll configure a PostgreSQL database. We'll use an Object-Relational Mapper (ORM) like SQLAlchemy for Python or Sequelize for Node.js to interact with the database. An ORM allows you to work with database records as programming objects, making your code cleaner and less error-prone.
+
+API Endpoints: You'll design and implement a single API endpoint, for example, /jobs/submit. This endpoint will accept a request payload (e.g., job_type, payload_data) and save it as a new record in your jobs table in the database.
+
+Data Models: We will define the database schema for the jobs table with columns like id, type, payload, status, and retries. We'll also define the data models for the API request and response to ensure type safety and validation.
+
+Key Concepts
+RESTful APIs: Learn the principles of creating clean, predictable API endpoints for resource manipulation.
+
+Database Schema Design: Understand how to structure your data for efficiency and maintainability.
+
+Data Validation: Use Pydantic (FastAPI) or similar libraries to automatically validate incoming request data, preventing invalid or malicious payloads from reaching your application logic.
+
+Dependency Management: Learn to manage project dependencies using pipenv or npm.
+
+Continuous Integration (CI): Grasp the basics of CI with GitHub Actions—automating your code quality checks to ensure every commit meets your standards.
+
+Week 2: Job Queue & Worker
+Tasks
+Queue Integration: We will integrate a message broker. Redis (used as a simple queue) or RabbitMQ (a more robust message broker) will be our choices. We'll connect our API service to the queue so that instead of just storing the job in the database, it also sends a message to the queue containing the job's ID.
+
+Worker Service: You'll create a new, separate service—the worker. This service will connect to the same message queue.
+
+Asynchronous Processing: The worker will listen for new messages on the queue. When it receives a message (a job ID), it will:
+
+Fetch the full job details from the database using the ID.
+
+Perform the task (e.g., a simulated send_email function).
+
+Update the job's status in the database to reflect processing, completed, or failed.
+
+Database Updates: The worker is responsible for updating the jobs table. This ensures the database is the single source of truth for the status of every job.
+
+Key Concepts
+Asynchronous Architecture: Understand the fundamental shift from synchronous, blocking operations to a non-blocking, event-driven model.
+
+Message Queues: Learn the purpose of message brokers: decoupling, buffering, and load distribution.
+
+Producer-Consumer Model: Your API is the producer of jobs, and your worker is the consumer. This is a classic distributed systems pattern.
+
+Idempotency: Learn how to design jobs that can be executed multiple times without causing unintended side effects. This is crucial for handling retries.
+
+Fault Tolerance: The queue ensures that if the worker fails, the job isn't lost.
+
+Week 3: Docker & Monitoring
+Tasks
+Dockerizing the Services: We'll write a Dockerfile for each service (API and worker). The Dockerfile will specify the environment, dependencies, and startup command for each service.
+
+Docker Compose: You'll create a docker-compose.yml file. This is the heart of this week's work. It will orchestrate all your services—the API, the worker, PostgreSQL, and Redis/RabbitMQ—allowing you to run the entire application stack with a single command: docker-compose up.
+
+Logging & Monitoring: We will add detailed logging to both the API and the worker. We will log every step of a job's lifecycle (e.g., job-id queued, job-id processing, job-id failed). This is crucial for debugging and monitoring a distributed system.
+
+Error Handling & Retries: We'll implement robust error handling. If a job fails, the worker will update the retries count in the database and potentially requeue the job with a delay. This is a critical feature for building a reliable system.
+
+Testing: You'll write unit tests for individual functions and integration tests that verify the entire job flow—from API submission to worker completion.
+
+Key Concepts
+Containerization: Understand the benefits of packaging applications with all their dependencies into a container.
+
+Infrastructure as Code: docker-compose.yml is a simple form of Infrastructure as Code, defining your application's architecture in a reproducible way.
+
+Observability: Learn the importance of logging for gaining visibility into your system's behavior.
+
+Resilience: Grasp the concept of building systems that can gracefully recover from failures.
+
+Test-Driven Development (TDD): The process of writing tests before or alongside your code ensures functionality and prevents regressions.
+
+Week 4: Cloud Deployment
+Tasks
+Container Registry: We will push the Docker images you built to a container registry, such as Amazon ECR or Docker Hub. This makes your images accessible for deployment.
+
+AWS EC2: We'll set up an AWS EC2 instance, which is a virtual server in the cloud. We'll install Docker and Docker Compose on it.
+
+Environment Variables: You'll configure environment variables on the EC2 instance to securely store sensitive information like database credentials and API keys, rather than hardcoding them in the application.
+
+CI/CD Pipeline Extension: We'll extend the GitHub Actions workflow. After the tests pass on every main branch push, the pipeline will automatically build the Docker images, push them to the registry, and then SSH into the EC2 instance to pull the new images and run docker-compose up, deploying the new version of your application.
+
+Key Concepts
+Cloud Computing: Understand the basics of deploying applications to a cloud provider.
+
+CI/CD (Continuous Integration/Continuous Deployment): Learn to automate the entire software delivery process, from code commit to production deployment.
+
+Secrets Management: Understand the importance of keeping sensitive data out of your codebase and using environment variables.
+
+Deployment Strategies: Grasp the concept of "pulling" the latest version of your application onto a server.
+
+Security Best Practices: Learn about the importance of using non-root users in containers and securing access to your cloud servers.
