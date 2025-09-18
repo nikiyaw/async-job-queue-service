@@ -11,7 +11,7 @@ services:
     ports:
       - "5433:5432"
 
-  queue:
+  redis:
     image: redis:6-alpine
     restart: always
     ports:
