@@ -10,6 +10,12 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
+  queue:
+    image: redis:6-alpine
+    restart: always
+    ports:
+      - "6379:6379"
   
 volumes:
   db_data:
