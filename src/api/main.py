@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, status
-from src.api.models import JobSubmission
+from api.models.job import JobSubmission
 
 from sqlalchemy.orm import Session
 from src.api.database import SessionLocal, engine, Job, Base
