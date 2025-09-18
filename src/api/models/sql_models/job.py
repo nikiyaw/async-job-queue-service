@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, JSON, DateTime, Enum
 from sqlalchemy.orm import relationship
 import datetime
 
-from ..core.database import Base
+from ...core.database import Base
 
 
 class Job(Base):

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from .routers import jobs
 from .core.database import Base, engine
-from .models.sql_models.job import job
+from .models.sql_models.job import Job
 
 
 app = FastAPI(
