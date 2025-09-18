@@ -93,3 +93,15 @@ Secrets Management: Understand the importance of keeping sensitive data out of y
 Deployment Strategies: Grasp the concept of "pulling" the latest version of your application onto a server.
 
 Security Best Practices: Learn about the importance of using non-root users in containers and securing access to your cloud servers.
+
+
+
+
+{
+  "job_type": "send_email",
+  "payload": {
+    "recipient_email": "test@example.com",
+    "subject": "Hello from the refactored API!",
+    "body": "This is a test to verify the new structure."
+  }
+}
