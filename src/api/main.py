@@ -16,7 +16,9 @@ def get_db():
         db.close()
         
 
-app = FastAPI()
+app = FastAPI(
+    title="Job Queue Service"
+)
 
 @app.get("/")
 def read_root():
