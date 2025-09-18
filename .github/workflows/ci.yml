@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on: 
     push: 
@@ -11,21 +11,6 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
-
-        services:
-            postgres:
-                image: postgres:13
-                env:
-                    POSTGRES_USER: user
-                    POSTGRES_PASSWORD: password
-                    POSTGRES_DB: jobs_db
-                ports:
-                    - 5433:5432 # We'll use 5433 just like locally, but it can be any free port.
-                options: >-
-                    --health-cmd pg_isready
-                    --health-interval 10s
-                    --health-timeout 5s
-                    --health-retries 5
 
         steps:
             - name: Checkout code
@@ -43,13 +28,30 @@ jobs:
             
             - name: Lint with flake8
               run: |
-                # stop the build if there are Python syntax errors or undefined names
                 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-                # exit-zero treats all errors as warnings. The Github editor is 127 chars wide
                 flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+            - name: Start services with Docker Compose
+              run: docker-compose up --build -d
+
+            - name: Wait for services to be ready
+              run: | 
+                echo "Waiting for PostgreSQL to be ready ..."
+                until docker-compose exec db pg_isready -U user -d jobs_db; do
+                  echo "Waiting for database ..."
+                  sleep 1
+                done
+                echo "Database is ready!"
+                echo "Waiting for Redis to be ready ..."
+                until docker-compose exec redis-cli ping; do
+                  echo "Waiting for Redis ..."
+                  sleep 1
+                done
+                echo "Redis is ready!"
 
             - name: Run tests
               env:
                 DATABASE_URL: postgresql://user:password@localhost:5433/jobs_db
+                REDIS_URL: redis://localhost:6379/
               run: |
                 pytest
