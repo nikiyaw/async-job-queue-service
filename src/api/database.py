@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 
 # Database connection string
-DATABASE_URL = "postgresql://user:password@host:port/dbname" # placeholder for now
+DATABASE_URL = "postgresql://user:password@localhost:5433/jobs_db" 
 
 # SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
