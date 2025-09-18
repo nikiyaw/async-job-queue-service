@@ -43,7 +43,7 @@ jobs:
                 done
                 echo "Database is ready!"
                 echo "Waiting for Redis to be ready ..."
-                until docker compose exec redis-cli ping; do
+                until docker compose exec redis redis-cli ping; do
                   echo "Waiting for Redis ..."
                   sleep 1
                 done
