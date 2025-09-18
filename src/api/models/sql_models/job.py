@@ -1,19 +1,9 @@
-from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime, Enum
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String, JSON, DateTime, Enum
+from sqlalchemy.orm import relationship
 import datetime
 
-# Database connection string
-DATABASE_URL = "postgresql://user:password@localhost:5433/jobs_db" 
+from ..core.database import Base
 
-# SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
-
-# Session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class for our models
-Base = declarative_base()
 
 class Job(Base):
     __tablename__ = "jobs"
