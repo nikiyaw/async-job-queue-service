@@ -11,6 +11,22 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:13
+                env:
+                    POSTGRES_USER: user
+                    POSTGRES_PASSWORD: password
+                    POSTGRES_DB: jobs_db
+                ports:
+                    - 5433:5432 # We'll use 5433 just like locally, but it can be any free port.
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -33,5 +49,7 @@ jobs:
                 flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
             - name: Run tests
+              env:
+                DATABASE_URL: postgresql://user:password@localhost:5433/jobs_db
               run: |
                 pytest
