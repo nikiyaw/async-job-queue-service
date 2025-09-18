@@ -32,4 +32,12 @@ def test_submit_job():
     assert response.status_code == 201
 
     # Assert that the response JSON matches our expected output
-    assert response.json() == {"message": "Job received successfully", "job_type": "send_email"}
+    # Corrected assertion: Expect the 'job_id' field.
+    expected_response = {
+        "message": "Job received successfully",
+        "job_id": response.json()["job_id"], # Get the dynamically generated job ID from the response
+        "job_type": "send_email"
+    }
+
+    # Assert that the response JSON matches our expected output
+    assert response.json() == expected_response
