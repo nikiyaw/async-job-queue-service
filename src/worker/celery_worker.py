@@ -27,24 +27,40 @@ def process_job(job_id: int):
         # Simulate a 5-second long-running task
         time.sleep(5) 
 
-        # This is a dummy result, In a real-world scenario, this would be the actual output of your task.
-        dummy_result = {"message": f"Job {job_id} completed successfully!", "status_code": 200}
+        # Simulate a failure for demonstration purposes: will raise an exception and trigger the 'except' block.
+        if job_id % 2 != 0:
+            raise ValueError("simulated job failure for odd-numbered job IDs.")
 
-        # Find the job by its ID
-        job = db.query(JobModel).filter(JobModel.id == job_id).first()
-        if job:
-            # Update the job's status
-            job.status = "completed"
-            # Set the new result here
-            job.result = dummy_result
-            db.commit()
-            print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
-        else:
-            print(f"Job with ID: {job_id} not found in the database.")
+        # Successful job: this is a dummy result, In a real-world scenario, this would be the actual output of your task.
+        dummy_result = {"message": f"Job {job_id} completed successfully!", "status_code": 200}
+        job_status = "completed"
+        job_error_message = None
+    
     except Exception as e:
-        db.rollback()
-        print(f"An error occured while updating job status for ID {job_id}: {e}")
+        # When an error occurs, capture the status and error message
+        job_status = "failed"
+        job_error_message = {"error": str(e), "details": "An unexpected error occurred during job processing."}
+        print(f"An error occurred while processing job {job_id}: {e}")
+
     finally:
-        db.close()
+        # This block always executes, whether an error occured or not
+        try:
+            # Find the job by its ID
+            job = db.query(JobModel).filter(JobModel.id == job_id).first()
+            if job:
+                # Update the job's status
+                job.status = job_status
+                # Set the new result here
+                job.result = dummy_result if job_status == "completed" else None
+                job.error_message = job_error_message
+                db.commit()
+                print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
+            else:
+                print(f"Job with ID: {job_id} not found in the database.")
+        except Exception as update_e:
+            db.rollback()
+            print(f"An error occured while updating job status for ID {job_id}: {update_e}")
+        finally:
+            db.close()
 
     return f"Job {job_id} completed successfully!"
