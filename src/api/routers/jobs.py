@@ -43,6 +43,12 @@ def get_job_status(job_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job with ID {job_id} not found."
         )
+    
+    # If the job failed, include the error message in the response
+    if job.status == "failed":
+        return {"job_id": job.id, "status": job.status, "error_message": job.error_message}
+    
+    # Otherwise, just return the status
     return {"job_id": job.id, "status": job.status}
 
 @router.get("/{job_id}/result", status_code=status.HTTP_200_OK)
