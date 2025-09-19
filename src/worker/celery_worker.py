@@ -25,7 +25,7 @@ def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
                 job.error_message = {"error": str(exc), "details": "Job failed after all retries."}
         except Exception as update_e:
             db.rollback()
-            print(f"An error occurred while trying to update status for failed job {job_id}: {e}")
+            print(f"An error occurred while trying to update status for failed job {job_id}: {update_e}")
 
 @celery_app.task(bind=True, on_failure=update_job_status_on_failure, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3})
 def process_job(self, job_id: int):
