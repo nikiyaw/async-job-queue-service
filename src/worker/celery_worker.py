@@ -1,7 +1,7 @@
-import time
 from celery import Celery
 from ..api.core.database import SessionLocal
 from ..api.models.sql_models.job import Job as JobModel
+from .db_utils import get_db_session
 
 # We will use an environment variable for the Redis URL later in a Docker Compose setup.
 # For now, we'll hardcode it to match our docker-compose.yml file.
@@ -16,20 +16,16 @@ def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
     This function is a failure handler. It runs when a task permanently fails.
     """
     job_id = args[0]
-    db = SessionLocal()
-    try:
-        job = db.query(JobModel).filter(JobModel.id == job_id).first()
-        if job:
-            job.status = "failed"
-            job.result = None
-            job.error_message = {"error": str(exc), "details": "Job failed after all retries."}
-            db.commit()
-            print(f"Job {job_id} permanently failed. Status updated to 'failed'.")
-    except Exception as update_e:
-        db.rollback()
-        print(f"An error occurred while trying to update status for failed job {job_id}: {e}")
-    finally:
-        db.close()
+    with get_db_session() as db:
+        try:
+            job = db.query(JobModel).filter(JobModel.id == job_id).first()
+            if job:
+                job.status = "failed"
+                job.result = None
+                job.error_message = {"error": str(exc), "details": "Job failed after all retries."}
+        except Exception as update_e:
+            db.rollback()
+            print(f"An error occurred while trying to update status for failed job {job_id}: {e}")
 
 @celery_app.task(bind=True, on_failure=update_job_status_on_failure, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 10})
 def process_job(self, job_id: int):
@@ -39,44 +35,38 @@ def process_job(self, job_id: int):
     In a real-world scenario, this would contain the actual job logic.
     """
     print(f"Processing job with ID: {job_id}, Attempt: {self.request.retires + 1}")
-    db = SessionLocal()
 
     try:
-        # 1. Get job payload from database
-        job = db.query(JobModel).filter(JobModel.id == job_id).first()
-        payload = job.payload
-        
-        # 2. Extract specific data from the payload
-        recipient = payload.get("recipient_email")
-        subject = payload.get("subject")
-        body = payload.get("body")
-        
-        # 3. THIS IS WHERE THE REAL LOGIC LIVES
-        # This is where you would call your email service client
-        # sendgrid_client.send_email(to=recipient, subject=subject, body=body)
-        
-        # 4. Define the successful result
-        final_result = {"status": "success", "message": "Email sent successfully."}
+        with get_db_session() as db:
+            # 1. Get job payload from database
+            job = db.query(JobModel).filter(JobModel.id == job_id).first()
+            payload = job.payload
+            
+            # 2. Extract specific data from the payload
+            recipient = payload.get("recipient_email")
+            subject = payload.get("subject")
+            body = payload.get("body")
+            
+            # 3. THIS IS WHERE THE REAL LOGIC LIVES
+            # This is where you would call your email service client
+            # sendgrid_client.send_email(to=recipient, subject=subject, body=body)
+            
+            # 4. Define the successful result
+            final_result = {"status": "success", "message": "Email sent successfully."}
 
-        # 5. Update the database with the final status and result
-        job.status = "completed"
-        job.result = final_result
-        job.error_message = None
-        db.commit()
-        print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
+            # 5. Update the database with the final status and result
+            job.status = "completed"
+            job.result = final_result
+            job.error_message = None
+            db.commit()
+            print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
 
     except Exception as e:
-        db.rollback()
-        print(f"An error occurred while processing job {job_id}. Retrying...")
-
-        job = db.query(JobModel).filter(JobModel.id == job_id).first()
-        if job:
-            job.retries = self.request.retries + 1
-            job.status = "retrying"
-            db.commit()
+        with get_db_session() as db:
+            job = db.query(JobModel).filter(JobModel.id == job_id).first()
+            if job:
+                job.retries = self.request.retries + 1
+                job.status = "retrying"
             print(f"An error occurred while processing job {job_id}: {e}")
 
         raise self.retry(exc=e)
-
-    finally:
-        db.close()
