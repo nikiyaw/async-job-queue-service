@@ -95,7 +95,8 @@ Deployment Strategies: Grasp the concept of "pulling" the latest version of your
 Security Best Practices: Learn about the importance of using non-root users in containers and securing access to your cloud servers.
 
 
-
+uvicorn src.api.main:app --reload
+celery -A src.worker.celery_worker worker --loglevel=info --pool=solo --queues=job_queue
 
 {
   "job_type": "send_email",
