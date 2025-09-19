@@ -105,3 +105,28 @@ Security Best Practices: Learn about the importance of using non-root users in c
     "body": "This is a test to verify the new structure."
   }
 }
+
+
+Week 1: Foundational Setup
+  - Goal: Establish the core infrastructure for the asynchronous job queue service.
+  - Key Concepts Learned: We set up Docker and Docker Compose to containerize our application and its services (FastAPI, PostgreSQL, Redis, and Celery), ensuring a consistent environment. We used SQLAlchemy as our Object-Relational Mapper to interact with the database and Celery for handling background tasks asynchronously.
+  - Problems & Fixes: Had to troubleshoot Docker Compose configurations to ensure all containers could communicate properly.
+
+Week 2: Job Queue & Testing
+  - Goal: Implement the job submission and status retrieval endpoints, and add comprehensive testing.
+  - Key Concepts Learned: We learned about the testing pyramid and the purpose of different test types. Unit tests are for testing individual components in isolation, and are fast and reliable. Integration tests verify that different parts of the system work together. We used mocking to enable fast, reliable unit tests without relying on external services like Celery or a live database. We used a pytest fixture with an in-memory SQLite database to ensure tests run in a clean, isolated environment.
+  - Problems & Fixes: Initially, our test setup was brittle because it depended on a live PostgreSQL database, leading to flaky tests. To fix this, we used a pytest fixture with an in-memory SQLite database, which ensures each test runs in a clean, isolated environment. We also had to troubleshoot ImportError issues by correcting the absolute import paths (from src.api.core...). Finally, we fixed a mock vs. real issue by correctly patching celery_app.send_task instead of the delay method, which allowed our unit tests to successfully simulate the worker.
+
+
+
+
+Next Steps: Week 3
+Week 3 will focus on adding more advanced functionality and improving the API. We'll be working on these tasks:
+
+Expose a job_result Endpoint: Right now, you can only check a job's status. We'll create a new endpoint (GET /jobs/{job_id}/result) that allows you to retrieve the actual result of a completed job (e.g., the output of a calculation or a success message).
+
+Handle Job Failures: We'll update the worker to handle errors gracefully. If a job fails, the worker will update the job's status to "failed" and store the error message in the database.
+
+Add a Retry Mechanism: We'll configure Celery to automatically retry a failed job a certain number of times before giving up. This is a crucial feature for a robust job queue.
+
+This work will make your job queue service production-ready by providing a complete user experience (retrieving results) and improving its resilience (handling failures and retries).
