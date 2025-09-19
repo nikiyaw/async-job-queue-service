@@ -38,13 +38,22 @@ def process_job(self, job_id: int):
 
     try:
         with get_db_session() as db:
+            # 1. Get job payload from database
             job = db.query(JobModel).filter(JobModel.id == job_id).first()
             payload = job.payload
             
-            raise ValueError("Simulated permanent job failure.")
-
+            # --- Your actual job logic goes here ---
+            # For example, sending an email, processing a file, etc.
+            # If a recoverable error occurs here (e.g., a network timeout),
+            # the 'except' block will handle the retry.
+            
+            # For demonstration, we'll simulate a successful completion.
+            # Just remove the 'raise' line and the job will succeed.
+            
+            # 2. Define the successful result
             final_result = {"status": "success", "message": "Email sent successfully."}
             
+            # 3. Update the database with the final status and result
             job.status = "completed"
             job.result = final_result
             job.error_message = None
@@ -58,4 +67,5 @@ def process_job(self, job_id: int):
                 job.status = "retrying"
             print(f"An error occurred while processing job {job_id}: {e}. Retrying...")
 
+        # Explicitly set the countdown to 10 seconds here.
         raise self.retry(exc=e, countdown=10)
