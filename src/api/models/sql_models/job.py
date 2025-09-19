@@ -15,3 +15,4 @@ class Job(Base):
     retries = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.now)
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    result = Column(JSON, nullable=True)
