@@ -11,56 +11,72 @@ REDIS_URL = "redis://localhost:6379"
 celery_app = Celery("job_processor", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.task_default_queue = "job_queue"
 
-# Celery will automatically discover and register tasks in this module.
-@celery_app.task
-def process_job(job_id: int):
+def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
     """
-    A task to simulate a long-running job.
+    This function is a failure handler. It runs when a task permanently fails.
+    """
+    job_id = args[0]
+    db = SessionLocal()
+    try:
+        job = db.query(JobModel).filter(JobModel.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.result = None
+            job.error_message = {"error": str(exc), "details": "Job failed after all retries."}
+            db.commit()
+            print(f"Job {job_id} permanently failed. Status updated to 'failed'.")
+    except Exception as update_e:
+        db.rollback()
+        print(f"An error occurred while trying to update status for failed job {job_id}: {e}")
+    finally:
+        db.close()
+
+@celery_app.task(bind=True, on_failure=update_job_status_on_failure, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 10})
+def process_job(self, job_id: int):
+    """
+    Simulates a long-running job and updates its status and result.
+    This version includes an automatic retry mechanism.
     In a real-world scenario, this would contain the actual job logic.
     """
-    print(f"Processing job with ID: {job_id}")
-
-    # Establish a database session
+    print(f"Processing job with ID: {job_id}, Attempt: {self.request.retires + 1}")
     db = SessionLocal()
 
     try:
-        # Simulate a 5-second long-running task
-        time.sleep(5) 
-
-        # This will simulate a failure for odd-numbered job IDs.
-        if job_id % 2 != 0:
-            raise ValueError("simulated job failure for odd-numbered job IDs.")
-
-        # If the job is successful, update the status to 'completed' and save the result
-        dummy_result = {"message": f"Job {job_id} completed successfully!", "status_code": 200}
+        # 1. Get job payload from database
         job = db.query(JobModel).filter(JobModel.id == job_id).first()
-        if job:
-            job.status = "completed"
-            job.result = dummy_result
-            job.error_message = None
-            db.commit()
-            print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
-        else:
-            print(f"Job with ID: {job_id} not found in the database.")
+        payload = job.payload
+        
+        # 2. Extract specific data from the payload
+        recipient = payload.get("recipient_email")
+        subject = payload.get("subject")
+        body = payload.get("body")
+        
+        # 3. THIS IS WHERE THE REAL LOGIC LIVES
+        # This is where you would call your email service client
+        # sendgrid_client.send_email(to=recipient, subject=subject, body=body)
+        
+        # 4. Define the successful result
+        final_result = {"status": "success", "message": "Email sent successfully."}
+
+        # 5. Update the database with the final status and result
+        job.status = "completed"
+        job.result = final_result
+        job.error_message = None
+        db.commit()
+        print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
 
     except Exception as e:
-        # If an error occurs, update the status to 'failed' and save the error message
         db.rollback()
-        try:
-            job = db.query(JobModel).filter(JobModel.id == job_id).first()
-            if job:
-                job.status = "failed"
-                job.result = None
-                job.error_message = {"error": str(e), "details": "An unexpected error occurred during job processing."}
-                db.commit()
-                print(f"An error occurred while processing job {job_id}: {e}")
-            else:
-                print(f"Job with ID: {job_id} not found in the database.")
-        except Exception as update_e:
-            db.rollback()
-            print(f"An error occured while updating job status for ID {job_id}: {update_e}")
+        print(f"An error occurred while processing job {job_id}. Retrying...")
 
-        raise
+        job = db.query(JobModel).filter(JobModel.id == job_id).first()
+        if job:
+            job.retries = self.request.retries + 1
+            job.status = "retrying"
+            db.commit()
+            print(f"An error occurred while processing job {job_id}: {e}")
+
+        raise self.retry(exc=e)
 
     finally:
         db.close()
