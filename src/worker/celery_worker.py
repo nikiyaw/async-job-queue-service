@@ -19,16 +19,24 @@ def process_job(job_id: int):
     In a real-world scenario, this would contain the actual job logic.
     """
     print(f"Processing job with ID: {job_id}")
-    time.sleep(5)  # Simulate a 5-second long-running task
 
     # Establish a database session
     db = SessionLocal()
+
     try:
+        # Simulate a 5-second long-running task
+        time.sleep(5) 
+
+        # This is a dummy result, In a real-world scenario, this would be the actual output of your task.
+        dummy_result = {"message": f"Job {job_id} completed successfully!", "status_code": 200}
+
         # Find the job by its ID
         job = db.query(JobModel).filter(JobModel.id == job_id).first()
         if job:
             # Update the job's status
             job.status = "completed"
+            # Set the new result here
+            job.result = dummy_result
             db.commit()
             print(f"Finished processing job with ID: {job_id}. Status updated to 'completed'.")
         else:
