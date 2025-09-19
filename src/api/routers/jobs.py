@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from ..models.job import JobSubmission # This is the Pydantic model
 from ..core.database import get_db # This is the database dependency
 from ..models.sql_models.job import Job as JobModel # This is the SQLAlchemy model
-from ..core.redis_config import redis_client
 from ...worker.celery_worker import celery_app
 
 router = APIRouter(
@@ -45,3 +44,25 @@ def get_job_status(job_id: int, db: Session = Depends(get_db)):
             detail=f"Job with ID {job_id} not found."
         )
     return {"job_id": job.id, "status": job.status}
+
+@router.get("/{job_id}/result", status_code=status.HTTP_200_OK)
+def get_job_result(job_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieves the result of a completed job from the database.
+    """
+    job = db.query(JobModel).filter(JobModel.id == job_id).first()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with ID {job_id} not found."
+        )
+    
+    # Check if the job has been completed
+    if job.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Job {job_id} is still in status '{job.status}'. The result is not yet available."
+        )
+    
+    return {"job_id": job.id, "result": job.result}
