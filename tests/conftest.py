@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.api.database import Base, get_db
+from src.api.core.database import Base, get_db
 from src.api.main import app
 from src.api.routers import jobs
 # We need to import the Job model to ensure the Enum for its status
