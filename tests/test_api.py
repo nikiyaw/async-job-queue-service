@@ -6,10 +6,8 @@ from unittest.mock import patch
 from sqlalchemy.orm import Session
 from src.api.models.sql_models.job import Job as JobModel
 
-# Create a test client
-client = TestClient(app)
 
-def test_read_root():
+def test_read_root(client: TestClient):
     # Make a GET request to the root endpoint
     response = client.get("/")
     # Assert that the response status code is 200 (OK)
@@ -17,7 +15,7 @@ def test_read_root():
     # Assert that the response JSON matches our expected output
     assert response.json() == {"message": "Welcome to the Job Queue Service!"}
 
-def test_submit_job():
+def test_submit_job(client: TestClient):
     # Define a sample job payload
     job_payload = {
         "job_type": "send_email",
@@ -41,7 +39,7 @@ def test_submit_job():
     # Assert that the response JSON matches our expected output
     assert response.json() == expected_response
 
-def test_job_status(db: Session):
+def test_job_status(client: TestClient, db: Session):
     # Submit a new job to start the process
     job_payload = {
         "job_type": "long_calculation",
@@ -69,7 +67,7 @@ def test_job_status(db: Session):
     assert status_response_completed.status_code == 200
     assert status_response_completed.json()["status"] == "completed"
 
-def test_job_not_found():
+def test_job_not_found(client: TestClient):
     # Test a non-existent job ID
     response = client.get("/jobs/status/99999") # ID that shouldn't exist
     assert response.status_code == 404
