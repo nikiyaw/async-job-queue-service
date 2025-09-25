@@ -42,3 +42,4 @@ class Job(Base):
     # Use our custom JSONType for the result column
     result = Column(JSONType(), nullable=True)
     error_message = Column(String, nullable=True)
+    
