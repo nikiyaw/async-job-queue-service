@@ -95,6 +95,29 @@ Deployment Strategies: Grasp the concept of "pulling" the latest version of your
 Security Best Practices: Learn about the importance of using non-root users in containers and securing access to your cloud servers.
 
 
+Week 4: Usability & Dockerization (Current Focus)
+Goal: Create a user-facing dashboard, implement a real-world job, and containerize the entire application stack.
+
+Tasks:
+
+Task 1: Build a Dashboard. Create a single-page HTML application that allows you to submit jobs and view their real-time status. This will be the main interface for your service.
+
+Task 2: Implement Real-World Job Logic. Replace the simulated failure with a simple but realistic task, such as sending an email or performing a computation. This is where you'll see your worker actually do useful work.
+
+Task 3: Dockerize the Application. Write a Dockerfile and a docker-compose.yml file to package the FastAPI app, the Celery worker, Redis, and PostgreSQL into a single, portable environment. This is crucial for deployment.
+
+Week 5: Final Touches & Deployment Prep (Future)
+Goal: Add final polish and prepare the service for a production environment.
+
+Tasks:
+
+Task 1: Add API Documentation. Implement comprehensive API documentation using OpenAPI/Swagger UI, which is automatically provided by FastAPI.
+
+Task 2: Implement Asynchronous API Endpoints. Convert your API endpoints to use Python's async/await for better performance under high load.
+
+Task 3: Final Code Review & Cleanup. Go through the entire codebase, remove any temporary testing code, and add final comments to ensure it meets best practices.
+
+
 uvicorn src.api.main:app --reload
 celery -A src.worker.celery_worker worker --loglevel=info --pool=solo --queues=job_queue
 
@@ -122,17 +145,3 @@ Week 3: Job Retries & Database Synchronization
 - Goal: Implement a robust, non-default retry mechanism for the Celery worker and ensure the database schema is correctly synchronized with the application logic.
 - Key Concepts Learned: We dived deep into building a more resilient system. We learned how to customize Celery's retry mechanism using the @celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3}) decorator. This allowed us to override the default exponential backoff with a specific 10-second delay using raise self.retry(exc=e, countdown=10). We also learned the crucial concept of database schema synchronization, understanding how SQLAlchemy's Base.metadata.create_all() can be used to automatically create database tables and ENUM types based on our Python models.
 - Problems & Fixes: The primary challenge was a persistent DataError (invalid input value for enum job_status: "retrying") and a LookupError. We discovered that the root cause was a mismatch between our Celery worker's code, which attempted to set a "retrying" status, and our database schema, which did not include this value. Initially, we attempted to fix this with manual SQL commands to alter the job_status ENUM in the PostgreSQL shell. While this worked temporarily, the issue reappeared when the database was reset. The ultimate, long-term fix was a two-step process: first, we updated the Job model in our code to include "retrying" in the Enum definition. Second, we moved the Base.metadata.create_all() call from the main file's top level into a FastAPI startup event handler. This ensures the database schema is always correctly created on application startup, solving the synchronization problem permanently.
-
-
-
-
-Next Steps: Week 3
-Week 3 will focus on adding more advanced functionality and improving the API. We'll be working on these tasks:
-
-Expose a job_result Endpoint: Right now, you can only check a job's status. We'll create a new endpoint (GET /jobs/{job_id}/result) that allows you to retrieve the actual result of a completed job (e.g., the output of a calculation or a success message).
-
-Handle Job Failures: We'll update the worker to handle errors gracefully. If a job fails, the worker will update the job's status to "failed" and store the error message in the database.
-
-Add a Retry Mechanism: We'll configure Celery to automatically retry a failed job a certain number of times before giving up. This is a crucial feature for a robust job queue.
-
-This work will make your job queue service production-ready by providing a complete user experience (retrieving results) and improving its resilience (handling failures and retries).
