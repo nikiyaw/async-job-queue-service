@@ -4,7 +4,6 @@ import time
 
 from unittest.mock import patch
 from sqlalchemy.orm import Session
-from src.api.core.database import SessionLocal
 from src.api.models.sql_models.job import Job as JobModel
 
 # Create a test client
@@ -42,7 +41,7 @@ def test_submit_job():
     # Assert that the response JSON matches our expected output
     assert response.json() == expected_response
 
-def test_job_status():
+def test_job_status(db: Session):
     # Submit a new job to start the process
     job_payload = {
         "job_type": "long_calculation",
@@ -56,8 +55,6 @@ def test_job_status():
         # Assert that the Celery task was called with the correct arguments
         mock_delay.assert_called_once_with("src.worker.celery_worker.process_job", args=[job_id], queue="job_queue")
     
-    # Get a new database session to simulate the worker's action
-    db: Session = SessionLocal()
     try:
         job = db.query(JobModel).filter(JobModel.id == job_id).first()
         assert job.status == "queued"
@@ -65,7 +62,7 @@ def test_job_status():
         job.status = "completed"
         db.commit()
     finally:
-        db.close()
+        pass
 
     # Check the status again, expecting 'completed'
     status_response_completed = client.get(f"/jobs/status/{job_id}")
