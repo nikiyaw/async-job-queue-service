@@ -1,9 +1,10 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.api.core.database import Base, get_db
 from src.api.main import app
+from src.api.core.database import Base, get_db
 from src.api.models.sql_models.job import Job as JobModel
+from fastapi.testclient import TestClient
 
 # Use an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -37,4 +38,5 @@ def client(db):
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    return app
+    with TestClient(app) as test_client:
+        yield test_client
