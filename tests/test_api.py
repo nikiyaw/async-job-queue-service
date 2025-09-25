@@ -36,7 +36,7 @@ def test_submit_job(client: TestClient):
     }
     assert response.json() == expected_response
 
-def test_job_status(client: TestClient, db: Session):
+def test_job_status(client: TestClient, db_session: Session):
     """
     Tests retrieving the status of a job and simulating a status change by a worker.
     """
@@ -51,10 +51,10 @@ def test_job_status(client: TestClient, db: Session):
         mock_delay.assert_called_once_with("src.worker.celery_worker.process_job", args=[job_id], queue="job_queue")
     
     try:
-        job = db.query(JobModel).filter(JobModel.id == job_id).first()
+        job = db_session.query(JobModel).filter(JobModel.id == job_id).first()
         assert job.status == "queued"
         job.status = "completed"
-        db.commit()
+        db_session.commit()
     finally:
         pass
 
