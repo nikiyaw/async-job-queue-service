@@ -1,9 +1,14 @@
+import logging
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..models.job import JobSubmission # This is the Pydantic model
 from ..core.database import get_db # This is the database dependency
 from ..models.sql_models.job import Job as JobModel # This is the SQLAlchemy model
 from ...worker.celery_worker import celery_app
+
+
+# NEW: Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/jobs",
@@ -28,7 +33,8 @@ def submit_job(job: JobSubmission, db: Session = Depends(get_db)):
     task_name = "src.worker.celery_worker.process_job"
     celery_app.send_task(task_name, args=[db_job.id], queue="job_queue")
 
-    print(f"Received job of type: {db_job.job_type} and persisted to DB with ID: {db_job.id}")
+    logger.info(f"API received job {db_job.id} (type: {db_job.job_type}) and queued it for processing.")
+
     return {"message": "Job received successfully", "job_id": db_job.id, "job_type": db_job.job_type}
 
 @router.get("/status/{job_id}", status_code=status.HTTP_200_OK)
@@ -56,9 +62,12 @@ def get_job_result(job_id: int, db: Session = Depends(get_db)):
     """
     Retrieves the result of a completed job from the database.
     """
+    logger.debug(f"API checking result for job ID: {job_id}")
+
     job = db.query(JobModel).filter(JobModel.id == job_id).first()
 
     if not job:
+        logger.warning(f"Result check failed: Job ID {job_id} not found.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job with ID {job_id} not found."
@@ -66,6 +75,7 @@ def get_job_result(job_id: int, db: Session = Depends(get_db)):
     
     # Check if the job has been completed
     if job.status != "completed":
+        logger.info(f"Result requested for job {job_id}, but status is still '{job.status}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Job {job_id} is still in status '{job.status}'. The result is not yet available."
