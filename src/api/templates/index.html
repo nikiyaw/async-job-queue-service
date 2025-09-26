@@ -63,3 +63,205 @@
             </div>
         </section>
     </div>
+
+    <!-- JavaScript for API Interaction -->
+    <script>
+        // Store the list of active jobs to poll
+        let activeJobs = [];
+        const jobList = document.getElementById('job-list');
+        const noJobsMessage = document.getElementById('no-jobs-message');
+        const messageBox = document.getElementById('message-box');
+
+        // Helper function to show temporary messages
+        function showMessage(text, isError = false) {
+            messageBox.textContent = text;
+            messageBox.className = 'mt-4 p-3 text-sm text-center rounded-md transition duration-300';
+            if (isError) {
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            } else {
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            }
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Helper function to get status badge styling
+        function getStatusClasses(status) {
+            switch (status.toLowerCase()) {
+                case 'queued':
+                    return { text: status.toUpperCase(), bg: 'bg-yellow-100', color: 'text-yellow-800' };
+                case 'processing':
+                    return { text: status.toUpperCase(), bg: 'bg-blue-100', color: 'text-blue-800' };
+                case 'completed':
+                    return { text: status.toUpperCase(), bg: 'bg-green-100', color: 'text-green-800' };
+                case 'failed':
+                    return { text: status.toUpperCase(), bg: 'bg-red-100', color: 'text-red-800' };
+                default:
+                    return { text: 'UNKNOWN', bg: 'bg-gray-100', color: 'text-gray-800' };
+            }
+        }
+
+        // Function to render a single job item
+        function renderJobItem(job) {
+            const existingItem = document.getElementById(`job-${job.job_id}`);
+            const statusInfo = getStatusClasses(job.status);
+            const statusHTML = `<span class="${statusInfo.bg} ${statusInfo.color} text-xs font-semibold px-2.5 py-0.5 rounded-full">${statusInfo.text}</span>`;
+            let resultHTML = '';
+
+            if (job.status.toLowerCase() === 'completed' && job.result) {
+                resultHTML = `<p class="mt-2 text-xs text-gray-600 truncate">Result: ${job.result}</p>`;
+            } else if (job.status.toLowerCase() === 'failed' && job.error_message) {
+                 resultHTML = `<p class="mt-2 text-xs text-red-600 truncate">Error: ${job.error_message}</p>`;
+            } else if (job.status.toLowerCase() === 'processing') {
+                 resultHTML = `<p class="mt-2 text-xs text-blue-600 italic">...Worker is executing task...</p>`;
+            }
+
+            const htmlContent = `
+                <div class="flex items-center justify-between p-4 bg-white rounded-lg border shadow-sm transition duration-300 hover:shadow-md">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Job #${job.job_id} (${job.job_type})</p>
+                        <p class="text-xs text-gray-500 truncate max-w-xs">Payload: ${job.payload || 'N/A'}</p>
+                        ${resultHTML}
+                    </div>
+                    ${statusHTML}
+                </div>
+            `;
+
+            if (existingItem) {
+                // Update existing item
+                existingItem.innerHTML = htmlContent;
+                // Update the job object in activeJobs list as well
+                const index = activeJobs.findIndex(j => j.job_id === job.job_id);
+                if (index !== -1) {
+                    activeJobs[index] = { ...activeJobs[index], status: job.status, result: job.result, error_message: job.error_message };
+                }
+            } else {
+                // Create new item
+                const newItem = document.createElement('div');
+                newItem.id = `job-${job.job_id}`;
+                newItem.innerHTML = htmlContent;
+                jobList.prepend(newItem);
+                
+                // Add to active jobs list for polling
+                activeJobs.unshift(job);
+                
+                // Hide the "no jobs" message
+                noJobsMessage.classList.add('hidden');
+            }
+        }
+
+        // Function to poll the API for job statuses
+        async function pollJobStatuses() {
+            if (activeJobs.length === 0) return;
+
+            // Filter out completed and failed jobs to stop polling them
+            const jobsToPoll = activeJobs.filter(job => 
+                job.status.toLowerCase() !== 'completed' && job.status.toLowerCase() !== 'failed'
+            );
+
+            // Fetch status for all remaining active jobs concurrently
+            const statusPromises = jobsToPoll.map(async (job) => {
+                try {
+                    const response = await fetch(`/jobs/status/${job.job_id}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    
+                    // If the status has changed, re-render the job item
+                    if (data.status.toLowerCase() !== job.status.toLowerCase()) {
+                        // Check for result if completed, this is an extra check but useful
+                        if (data.status.toLowerCase() === 'completed') {
+                            const resultResponse = await fetch(`/jobs/${job.job_id}/result`);
+                            const resultData = await resultResponse.json();
+                            data.result = resultData.result;
+                        }
+
+                        renderJobItem({ ...job, ...data });
+                    }
+                    
+                } catch (error) {
+                    console.error(`Error polling status for job ${job.job_id}:`, error);
+                    // Handle polling error: mark as failed if the API couldn't be reached or 404
+                    if (job.status.toLowerCase() !== 'failed') {
+                        renderJobItem({ 
+                            ...job, 
+                            status: 'Failed', 
+                            error_message: 'API Status Check Failed.' 
+                        });
+                    }
+                }
+            });
+
+            await Promise.all(statusPromises);
+            
+            // Clean up the activeJobs list to only include non-finished jobs
+            activeJobs = activeJobs.filter(job => 
+                job.status.toLowerCase() !== 'completed' && job.status.toLowerCase() !== 'failed'
+            );
+            
+            // If all jobs are complete, show the "no jobs" message if the list is empty
+            if (activeJobs.length === 0 && jobList.children.length === 0) {
+                 noJobsMessage.classList.remove('hidden');
+            }
+        }
+
+        // Set up the form submission handler
+        document.getElementById('job-submission-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.target;
+            const jobType = form.elements.job_type.value;
+            const payload = form.elements.payload.value;
+
+            // Prepare data for the API
+            const jobData = {
+                job_type: jobType,
+                payload: payload || null // Send null if payload is empty
+            };
+
+            try {
+                const response = await fetch('/jobs/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(jobData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Job #${data.job_id} submitted successfully!`);
+                    
+                    // Immediately render the new job with 'queued' status
+                    renderJobItem({
+                        job_id: data.job_id,
+                        job_type: data.job_type,
+                        payload: payload,
+                        status: 'queued',
+                        result: null,
+                        error_message: null
+                    });
+
+                    // Clear form payload input after successful submission
+                    form.elements.payload.value = ''; 
+                } else {
+                    showMessage(`Error submitting job: ${data.detail || response.statusText}`, true);
+                }
+            } catch (error) {
+                console.error('Submission failed:', error);
+                showMessage('Network error: Could not connect to the API.', true);
+            }
+        });
+
+        // Start polling every 2 seconds
+        setInterval(pollJobStatuses, 2000);
+
+        // Run once on load to start the polling loop
+        // We could load existing jobs here in a future enhancement, but for simplicity, we start clean.
+        pollJobStatuses(); 
+    </script>
+</body>
+</html>
