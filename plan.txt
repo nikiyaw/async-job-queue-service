@@ -73,49 +73,56 @@ Resilience: Grasp the concept of building systems that can gracefully recover fr
 
 Test-Driven Development (TDD): The process of writing tests before or alongside your code ensures functionality and prevents regressions.
 
-Week 4: Cloud Deployment
-Tasks
-Container Registry: We will push the Docker images you built to a container registry, such as Amazon ECR or Docker Hub. This makes your images accessible for deployment.
+Week 4: Usability, Observability & Dockerization
+Goal: Create a user-facing dashboard, implement a realistic background job, add crucial logging, and containerize the entire application stack.
 
-AWS EC2: We'll set up an AWS EC2 instance, which is a virtual server in the cloud. We'll install Docker and Docker Compose on it.
+Task 1: Build a Dashboard.
 
-Environment Variables: You'll configure environment variables on the EC2 instance to securely store sensitive information like database credentials and API keys, rather than hardcoding them in the application.
+Create a single-page HTML application with a simple, clean UI. It will serve as the front end for your API, allowing you to submit jobs and see their status in real-time.
 
-CI/CD Pipeline Extension: We'll extend the GitHub Actions workflow. After the tests pass on every main branch push, the pipeline will automatically build the Docker images, push them to the registry, and then SSH into the EC2 instance to pull the new images and run docker-compose up, deploying the new version of your application.
+Task 2: Implement Real-World Job Logic.
 
-Key Concepts
-Cloud Computing: Understand the basics of deploying applications to a cloud provider.
+Replace the placeholder logic with a more realistic task, such as performing a simple data analysis or a computation. This will allow us to see the Celery worker perform actual work.
 
-CI/CD (Continuous Integration/Continuous Deployment): Learn to automate the entire software delivery process, from code commit to production deployment.
+Task 3: Implement Logging & Monitoring.
 
-Secrets Management: Understand the importance of keeping sensitive data out of your codebase and using environment variables.
+Logging: Add detailed logging to both the FastAPI API and the Celery worker. We will log every step of a job's lifecycle (e.g., job-id queued, job-id processing, job-id failed) using Python's built-in logging module.
 
-Deployment Strategies: Grasp the concept of "pulling" the latest version of your application onto a server.
+Observability: Learn the importance of logging for gaining visibility into a distributed system's behavior and for debugging production issues.
 
-Security Best Practices: Learn about the importance of using non-root users in containers and securing access to your cloud servers.
+Task 4: Dockerize the Application.
 
+Write a Dockerfile for the main application and a docker-compose.yml file to orchestrate the entire stack, including the API, worker, PostgreSQL, and Redis. This will make our application portable and ready for deployment.
 
-Week 4: Usability & Dockerization (Current Focus)
-Goal: Create a user-facing dashboard, implement a real-world job, and containerize the entire application stack.
-
-Tasks:
-
-Task 1: Build a Dashboard. Create a single-page HTML application that allows you to submit jobs and view their real-time status. This will be the main interface for your service.
-
-Task 2: Implement Real-World Job Logic. Replace the simulated failure with a simple but realistic task, such as sending an email or performing a computation. This is where you'll see your worker actually do useful work.
-
-Task 3: Dockerize the Application. Write a Dockerfile and a docker-compose.yml file to package the FastAPI app, the Celery worker, Redis, and PostgreSQL into a single, portable environment. This is crucial for deployment.
-
-Week 5: Final Touches & Deployment Prep (Future)
+Week 5: Final Touches & Deployment Prep
 Goal: Add final polish and prepare the service for a production environment.
 
-Tasks:
+Task 1: Add API Documentation.
 
-Task 1: Add API Documentation. Implement comprehensive API documentation using OpenAPI/Swagger UI, which is automatically provided by FastAPI.
+Implement comprehensive API documentation using FastAPI's built-in OpenAPI/Swagger UI. This will make your API easy for other developers to use.
 
-Task 2: Implement Asynchronous API Endpoints. Convert your API endpoints to use Python's async/await for better performance under high load.
+Task 2: Implement Asynchronous API Endpoints.
 
-Task 3: Final Code Review & Cleanup. Go through the entire codebase, remove any temporary testing code, and add final comments to ensure it meets best practices.
+Convert your API endpoints to use Python's async/await for better performance under high load.
+
+Task 3: Final Code Review & Cleanup.
+
+Go through the entire codebase, remove any temporary testing code, and add final comments to ensure it meets best practices.
+
+Week 6: GCP Deployment & Observability
+Goal: Deploy the application to GCP and set up a basic, real-world production environment.
+
+Task 1: GCP Account & Core Services.
+
+We will start by setting up a GCP account and provisioning Cloud SQL for PostgreSQL and Memorystore for Redis.
+
+Task 2: Container Registry & Deployment Strategy.
+
+We'll use Google's Artifact Registry to store our Docker images. Then, we'll choose a deployment strategy using Google Cloud Run for a simple and scalable approach.
+
+Task 3: Deployment.
+
+We'll deploy our containerized application to Google Cloud Run and configure the services to communicate with each other in the cloud.
 
 
 uvicorn src.api.main:app --reload
