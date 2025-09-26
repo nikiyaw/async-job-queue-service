@@ -13,7 +13,8 @@ def test_read_root(client: TestClient):
     """
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to the Job Queue Service!"}
+    assert response.headers['content-type'] == 'text/html; charset=utf-8'
+    assert response.content.decode().startswith('<!DOCTYPE html>')
 
 def test_submit_job(client: TestClient):
     """
