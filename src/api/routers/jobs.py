@@ -35,7 +35,18 @@ def submit_job(job: JobSubmission, db: Session = Depends(get_db)):
 
     logger.info(f"API received job {db_job.id} (type: {db_job.job_type}) and queued it for processing.")
 
-    return {"message": "Job received successfully", "job_id": db_job.id, "job_type": db_job.job_type}
+    return {"message": "Job received successfully", "job_id": db_job.id, "job_type": db_job.job_type, "status": db_job.status}
+
+# NEW ROUTE: Handles GET /jobs/ which fetches all jobs for the dashboard list
+@router.get("/", status_code=status.HTTP_200_OK)
+def get_all_jobs(db: Session = Depends(get_db)):
+    """
+    Retrieves a list of all jobs from the database, ordered by ID descending.
+    """
+    # Query all jobs, ordered by descending ID (most recent first)
+    jobs = db.query(JobModel).order_by(JobModel.id.desc()).all()
+    # FastAPI automatically handles the serialization of the list of SQLAlchemy objects
+    return jobs
 
 @router.get("/status/{job_id}", status_code=status.HTTP_200_OK)
 def get_job_status(job_id: int, db: Session = Depends(get_db)):

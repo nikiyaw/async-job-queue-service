@@ -3,265 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Async Job Dashboard</title>
-    <!-- Load Tailwind CSS -->
+    <title>Asynchronous Job Queue Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configure Tailwind for Inter font and basic styling -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 20px;
+            background-color: #f7fafc;
+        }
+        /* Minor style adjustments for badges */
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
     </style>
 </head>
-<body class="p-4 sm:p-8">
-    <div class="w-full max-w-4xl bg-white shadow-xl rounded-xl p-6 md:p-10">
-        <!-- Header -->
-        <header class="mb-8 border-b pb-4">
-            <h1 class="text-3xl font-bold text-gray-800">Async Job Queue Service Dashboard</h1>
-            <p class="text-sm text-gray-500">Submit new background tasks and monitor their real-time status.</p>
+<body class="min-h-screen p-4 sm:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center py-6 border-b border-gray-200 mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900">Worker Job Dashboard</h1>
+            <p class="text-gray-500 mt-2">Manage and monitor asynchronous job processing status.</p>
         </header>
 
-        <!-- Job Submission Form -->
-        <section class="mb-10 p-6 bg-indigo-50 rounded-lg shadow-inner">
-            <h2 class="text-xl font-semibold text-gray-700 mb-4">Submit a New Job</h2>
-            <form id="job-submission-form" class="space-y-4">
+        <!-- Job Submission Card -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Submit New Job</h2>
+            <div class="space-y-4">
                 <div>
-                    <label for="job_type" class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
-                    <select id="job_type" name="job_type" required
-                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
-                        <option value="Send Email">Send Email</option>
-                        <option value="Long Computation">Long Computation</option>
-                        <option value="Data Analysis">Data Analysis</option>
+                    <label for="jobType" class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                    <select id="jobType" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                        <option value="Send Email">Send Email (Quick)</option>
+                        <option value="Long Computation">Long Computation (10s)</option>
+                        <option value="Data Analysis">Data Analysis (Retry Example)</option>
                     </select>
                 </div>
                 <div>
-                    <label for="payload" class="block text-sm font-medium text-gray-700 mb-1">Payload (Optional data)</label>
-                    <input type="text" id="payload" name="payload" placeholder="e.g., recipient@example.com, input_data"
-                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <label for="payload" class="block text-sm font-medium text-gray-700 mb-1">Payload (MUST be valid JSON, e.g., {"user_id": 1})</label>
+                    <input type="text" id="payload" value="{}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" placeholder="Enter optional JSON payload or text">
                 </div>
-                <button type="submit"
-                    class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
-                    Submit Job
+                <button onclick="submitJob()" class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-200 shadow-md">
+                    Queue Job
                 </button>
-            </form>
-            <div id="message-box" class="mt-4 p-3 text-sm text-center rounded-md hidden"></div>
-        </section>
-
-        <!-- Job Status History -->
-        <section>
-            <h2 class="text-xl font-semibold text-gray-700 mb-4">Job Status History</h2>
-            <div id="job-list" class="space-y-3">
-                <!-- Job items will be injected here -->
-                <p class="text-gray-500 text-sm italic" id="no-jobs-message">Submit a job above to see its status here.</p>
             </div>
-        </section>
+            <div id="statusMessage" class="mt-4 text-center font-medium"></div>
+        </div>
+
+        <!-- Job List Card -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Queued and Completed Jobs</h2>
+            <div id="jobList" class="space-y-4">
+                <!-- Jobs will be rendered here by JavaScript -->
+            </div>
+        </div>
     </div>
 
-    <!-- JavaScript for API Interaction -->
     <script>
-        // Store the list of active jobs to poll
-        let activeJobs = [];
-        const jobList = document.getElementById('job-list');
-        const noJobsMessage = document.getElementById('no-jobs-message');
-        const messageBox = document.getElementById('message-box');
+        // Mapping status to Tailwind classes for visual clarity
+        const statusColors = {
+            'queued': 'bg-gray-100 text-gray-800',
+            'retrying': 'bg-orange-100 text-orange-800',
+            'processing': 'bg-blue-100 text-blue-800',
+            'completed': 'bg-green-100 text-green-800',
+            'failed': 'bg-red-100 text-red-800',
+        };
 
-        // Helper function to show temporary messages
-        function showMessage(text, isError = false) {
-            messageBox.textContent = text;
-            messageBox.className = 'mt-4 p-3 text-sm text-center rounded-md transition duration-300';
-            if (isError) {
-                messageBox.classList.add('bg-red-100', 'text-red-800');
-            } else {
-                messageBox.classList.add('bg-green-100', 'text-green-800');
-            }
-            messageBox.classList.remove('hidden');
-            setTimeout(() => {
-                messageBox.classList.add('hidden');
-            }, 3000);
-        }
+        async function submitJob() {
+            const jobType = document.getElementById('jobType').value;
+            const payloadRaw = document.getElementById('payload').value;
+            const statusMessage = document.getElementById('statusMessage');
 
-        // Helper function to get status badge styling
-        function getStatusClasses(status) {
-            switch (status.toLowerCase()) {
-                case 'queued':
-                    return { text: status.toUpperCase(), bg: 'bg-yellow-100', color: 'text-yellow-800' };
-                case 'processing':
-                    return { text: status.toUpperCase(), bg: 'bg-blue-100', color: 'text-blue-800' };
-                case 'completed':
-                    return { text: status.toUpperCase(), bg: 'bg-green-100', color: 'text-green-800' };
-                case 'failed':
-                    return { text: status.toUpperCase(), bg: 'bg-red-100', color: 'text-red-800' };
-                default:
-                    return { text: 'UNKNOWN', bg: 'bg-gray-100', color: 'text-gray-800' };
-            }
-        }
+            let payloadObject;
 
-        // Function to render a single job item
-        function renderJobItem(job) {
-            const existingItem = document.getElementById(`job-${job.job_id}`);
-            const statusInfo = getStatusClasses(job.status);
-            const statusHTML = `<span class="${statusInfo.bg} ${statusInfo.color} text-xs font-semibold px-2.5 py-0.5 rounded-full">${statusInfo.text}</span>`;
-            let resultHTML = '';
-
-            if (job.status.toLowerCase() === 'completed' && job.result) {
-                resultHTML = `<p class="mt-2 text-xs text-gray-600 truncate">Result: ${job.result}</p>`;
-            } else if (job.status.toLowerCase() === 'failed' && job.error_message) {
-                 resultHTML = `<p class="mt-2 text-xs text-red-600 truncate">Error: ${job.error_message}</p>`;
-            } else if (job.status.toLowerCase() === 'processing') {
-                 resultHTML = `<p class="mt-2 text-xs text-blue-600 italic">...Worker is executing task...</p>`;
-            }
-
-            const htmlContent = `
-                <div class="flex items-center justify-between p-4 bg-white rounded-lg border shadow-sm transition duration-300 hover:shadow-md">
-                    <div>
-                        <p class="text-sm font-medium text-gray-900">Job #${job.job_id} (${job.job_type})</p>
-                        <p class="text-xs text-gray-500 truncate max-w-xs">Payload: ${job.payload || 'N/A'}</p>
-                        ${resultHTML}
-                    </div>
-                    ${statusHTML}
-                </div>
-            `;
-
-            if (existingItem) {
-                // Update existing item
-                existingItem.innerHTML = htmlContent;
-                // Update the job object in activeJobs list as well
-                const index = activeJobs.findIndex(j => j.job_id === job.job_id);
-                if (index !== -1) {
-                    activeJobs[index] = { ...activeJobs[index], status: job.status, result: job.result, error_message: job.error_message };
-                }
-            } else {
-                // Create new item
-                const newItem = document.createElement('div');
-                newItem.id = `job-${job.job_id}`;
-                newItem.innerHTML = htmlContent;
-                jobList.prepend(newItem);
-                
-                // Add to active jobs list for polling
-                activeJobs.unshift(job);
-                
-                // Hide the "no jobs" message
-                noJobsMessage.classList.add('hidden');
-            }
-        }
-
-        // Function to poll the API for job statuses
-        async function pollJobStatuses() {
-            if (activeJobs.length === 0) return;
-
-            // Filter out completed and failed jobs to stop polling them
-            const jobsToPoll = activeJobs.filter(job => 
-                job.status.toLowerCase() !== 'completed' && job.status.toLowerCase() !== 'failed'
-            );
-
-            // Fetch status for all remaining active jobs concurrently
-            const statusPromises = jobsToPoll.map(async (job) => {
-                try {
-                    const response = await fetch(`/jobs/status/${job.job_id}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    
-                    // If the status has changed, re-render the job item
-                    if (data.status.toLowerCase() !== job.status.toLowerCase()) {
-                        // Check for result if completed, this is an extra check but useful
-                        if (data.status.toLowerCase() === 'completed') {
-                            const resultResponse = await fetch(`/jobs/${job.job_id}/result`);
-                            const resultData = await resultResponse.json();
-                            data.result = resultData.result;
-                        }
-
-                        renderJobItem({ ...job, ...data });
-                    }
-                    
-                } catch (error) {
-                    console.error(`Error polling status for job ${job.job_id}:`, error);
-                    // Handle polling error: mark as failed if the API couldn't be reached or 404
-                    if (job.status.toLowerCase() !== 'failed') {
-                        renderJobItem({ 
-                            ...job, 
-                            status: 'Failed', 
-                            error_message: 'API Status Check Failed.' 
-                        });
-                    }
-                }
-            });
-
-            await Promise.all(statusPromises);
-            
-            // Clean up the activeJobs list to only include non-finished jobs
-            activeJobs = activeJobs.filter(job => 
-                job.status.toLowerCase() !== 'completed' && job.status.toLowerCase() !== 'failed'
-            );
-            
-            // If all jobs are complete, show the "no jobs" message if the list is empty
-            if (activeJobs.length === 0 && jobList.children.length === 0) {
-                 noJobsMessage.classList.remove('hidden');
-            }
-        }
-
-        // Set up the form submission handler
-        document.getElementById('job-submission-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const jobType = form.elements.job_type.value;
-            const payload = form.elements.payload.value;
-
-            // Prepare data for the API
-            const jobData = {
-                job_type: jobType,
-                payload: payload || null // Send null if payload is empty
-            };
-
+            // CRITICAL FIX: Attempt to parse the payload string into a JSON object
             try {
+                payloadObject = JSON.parse(payloadRaw);
+            } catch (e) {
+                statusMessage.className = 'mt-4 text-center font-medium text-red-600';
+                statusMessage.textContent = `Error: Invalid JSON in Payload field. Please ensure it is a valid object (e.g., {"key": "value"}).`;
+                return; // Stop submission
+            }
+            
+            try {
+                // Now submit the job with the correctly parsed payload object
                 const response = await fetch('/jobs/submit', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(jobData)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_type: jobType,
+                        payload: payloadObject // This is now a JSON object, satisfying Pydantic
+                    })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showMessage(`Job #${data.job_id} submitted successfully!`);
-                    
-                    // Immediately render the new job with 'queued' status
-                    renderJobItem({
-                        job_id: data.job_id,
-                        job_type: data.job_type,
-                        payload: payload,
-                        status: 'queued',
-                        result: null,
-                        error_message: null
-                    });
-
-                    // Clear form payload input after successful submission
-                    form.elements.payload.value = ''; 
+                    statusMessage.className = 'mt-4 text-center font-medium text-green-600';
+                    statusMessage.textContent = `Job queued successfully! ID: ${data.job_id} - Status: ${data.status}`;
                 } else {
-                    showMessage(`Error submitting job: ${data.detail || response.statusText}`, true);
+                    // Improved error handling to show server-side error details
+                    statusMessage.className = 'mt-4 text-center font-medium text-red-600';
+                    
+                    let errorMessage = 'Submission failed.';
+                    if (data.detail && Array.isArray(data.detail)) {
+                        // FastAPI 422 errors structure details as an array of objects
+                        errorMessage = `Submission failed: ${data.detail[0].msg} at ${data.detail[0].loc.join('.')}`;
+                    } else if (data.detail) {
+                        errorMessage = `Submission failed: ${data.detail}`;
+                    } else if (data.error) {
+                        errorMessage = `Submission failed: ${data.error}`;
+                    }
+                    statusMessage.textContent = errorMessage;
                 }
             } catch (error) {
-                console.error('Submission failed:', error);
-                showMessage('Network error: Could not connect to the API.', true);
+                statusMessage.className = 'mt-4 text-center font-medium text-red-600';
+                statusMessage.textContent = `Network error: ${error.message}`;
             }
-        });
+            fetchJobs(); // Refresh job list after submission
+        }
 
-        // Start polling every 2 seconds
-        setInterval(pollJobStatuses, 2000);
+        function renderJobs(jobs) {
+            const jobList = document.getElementById('jobList');
+            jobList.innerHTML = ''; // Clear existing list
 
-        // Run once on load to start the polling loop
-        // We could load existing jobs here in a future enhancement, but for simplicity, we start clean.
-        pollJobStatuses(); 
+            // Sort by ID descending (most recent first)
+            jobs.sort((a, b) => b.id - a.id);
+
+            jobs.forEach(job => {
+                // Handle status mapping slightly differently from SQL model's 'queued'
+                const statusKey = job.status === 'queued' ? 'queued' : job.status;
+                const statusClass = statusColors[statusKey] || 'bg-gray-100 text-gray-800';
+                
+                let resultDisplay = job.result ? JSON.stringify(job.result, null, 2) : 'N/A';
+                if (job.status === 'failed' && job.error_message) {
+                    // If failed, show the error message. Use job.error_message directly.
+                    try {
+                         // Attempt to pretty print if error_message is JSON, otherwise just use the string
+                        resultDisplay = JSON.stringify(job.error_message, null, 2); 
+                    } catch (e) {
+                         resultDisplay = String(job.error_message);
+                    }
+                }
+
+                const jobElement = document.createElement('div');
+                jobElement.className = 'p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition duration-150';
+                jobElement.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-bold text-gray-900">Job ID: ${job.id}</span>
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass} uppercase tracking-wider">
+                            ${job.status}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-1">Type: <span class="font-medium text-gray-700">${job.job_type}</span></p>
+                    <p class="text-sm text-gray-600 mb-1">Retries: <span class="font-medium text-gray-700">${job.retries || 0}</span></p>
+                    <div class="mt-2">
+                        <p class="text-sm font-medium text-gray-700 mb-1">Result / Error:</p>
+                        <pre class="bg-gray-50 p-2 rounded-md text-xs overflow-x-auto text-gray-700">${resultDisplay}</pre>
+                    </div>
+                `;
+                jobList.appendChild(jobElement);
+            });
+        }
+
+        async function fetchJobs() {
+            try {
+                // FIX: Change to '/jobs/' to prevent the 307 Temporary Redirect loop
+                const response = await fetch('/jobs/');
+                if (response.ok) {
+                    const jobs = await response.json();
+                    renderJobs(jobs);
+                } else {
+                    console.error("Failed to fetch jobs:", response.status);
+                }
+            } catch (error) {
+                console.error("Network error while fetching jobs:", error);
+            }
+        }
+
+        // Fetch jobs immediately and then poll every 5 seconds for real-time updates
+        fetchJobs();
+        setInterval(fetchJobs, 5000); 
     </script>
 </body>
 </html>
