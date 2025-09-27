@@ -3,187 +3,291 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asynchronous Job Queue Dashboard</title>
+    <title>Job Queue Dashboard</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7fafc;
+            background-color: #f3f4f6;
         }
-        /* Minor style adjustments for badges */
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
+        /* Custom scrollbar style for job list */
+        .job-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .job-list-container::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 4px;
+        }
+        .job-list-container::-webkit-scrollbar-track {
+            background-color: #f9fafb;
         }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
-    <div class="max-w-6xl mx-auto">
-        <header class="text-center py-6 border-b border-gray-200 mb-8">
-            <h1 class="text-4xl font-extrabold text-gray-900">Worker Job Dashboard</h1>
-            <p class="text-gray-500 mt-2">Manage and monitor asynchronous job processing status.</p>
+
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Asynchronous Job Queue 🚀</h1>
+            <p class="text-lg text-gray-600">FastAPI API + Celery Worker + Redis Broker + PostgreSQL DB</p>
         </header>
 
         <!-- Job Submission Card -->
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Submit New Job</h2>
-            <div class="space-y-4">
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-4">Submit a New Job</h2>
+            <form id="submitJobForm" class="space-y-4">
                 <div>
                     <label for="jobType" class="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
-                    <select id="jobType" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
-                        <option value="Send Email">Send Email (Quick)</option>
-                        <option value="Long Computation">Long Computation (10s)</option>
-                        <option value="Data Analysis">Data Analysis (Retry Example)</option>
+                    <select id="jobType" name="job_type" required 
+                            class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2">
+                        <option value="Data Analysis">Data Analysis</option>
+                        <option value="Image Processing">Image Processing</option>
+                        <option value="Send Email">Send Email</option>
                     </select>
                 </div>
                 <div>
-                    <label for="payload" class="block text-sm font-medium text-gray-700 mb-1">Payload (MUST be valid JSON, e.g., {"user_id": 1})</label>
-                    <input type="text" id="payload" value="{}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" placeholder="Enter optional JSON payload or text">
+                    <label for="payload" class="block text-sm font-medium text-gray-700 mb-1">Payload (JSON)</label>
+                    <textarea id="payload" name="payload" rows="4" required 
+                              class="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-sm"
+                              placeholder='{"input_data": 100}'></textarea>
                 </div>
-                <button onclick="submitJob()" class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-200 shadow-md">
+                <button type="submit" 
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
                     Queue Job
                 </button>
+            </form>
+            
+            <!-- UPDATED MESSAGE STRUCTURE -->
+            <div id="message" class="mt-4 p-3 rounded-lg text-sm hidden">
+                <div class="flex justify-between items-center">
+                    <span id="messageContent"></span>
+                    <!-- The dismiss button is now larger and uses cursor-pointer -->
+                    <button id="dismissMessage" class="ml-4 text-2xl font-bold cursor-pointer text-current opacity-75 hover:opacity-100 focus:outline-none">
+                        &times;
+                    </button>
+                </div>
             </div>
-            <div id="statusMessage" class="mt-4 text-center font-medium"></div>
+            <!-- END UPDATED MESSAGE STRUCTURE -->
         </div>
 
-        <!-- Job List Card -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Queued and Completed Jobs</h2>
-            <div id="jobList" class="space-y-4">
-                <!-- Jobs will be rendered here by JavaScript -->
+        <!-- Job Status Dashboard -->
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Job Status Feed</h2>
+            <div class="job-list-container h-80 overflow-y-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobListBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Job rows will be injected here by JavaScript -->
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">Loading job history...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
-        // Mapping status to Tailwind classes for visual clarity
-        const statusColors = {
-            'queued': 'bg-gray-100 text-gray-800',
-            'retrying': 'bg-orange-100 text-orange-800',
-            'processing': 'bg-blue-100 text-blue-800',
-            'completed': 'bg-green-100 text-green-800',
-            'failed': 'bg-red-100 text-red-800',
-        };
+        // --- Utility Functions ---
 
-        async function submitJob() {
-            const jobType = document.getElementById('jobType').value;
-            const payloadRaw = document.getElementById('payload').value;
-            const statusMessage = document.getElementById('statusMessage');
-
-            let payloadObject;
-
-            // CRITICAL FIX: Attempt to parse the payload string into a JSON object
-            try {
-                payloadObject = JSON.parse(payloadRaw);
-            } catch (e) {
-                statusMessage.className = 'mt-4 text-center font-medium text-red-600';
-                statusMessage.textContent = `Error: Invalid JSON in Payload field. Please ensure it is a valid object (e.g., {"key": "value"}).`;
-                return; // Stop submission
+        /**
+         * Formats the job status into a visually appealing badge.
+         * @param {string} status 
+         * @returns {string} HTML for the status badge.
+         */
+        function getStatusBadge(status) {
+            let color;
+            switch (status) {
+                case 'queued':
+                    color = 'bg-gray-100 text-gray-800';
+                    break;
+                case 'processing':
+                    color = 'bg-blue-100 text-blue-800 animate-pulse';
+                    break;
+                case 'completed':
+                    color = 'bg-green-100 text-green-800';
+                    break;
+                case 'failed':
+                    color = 'bg-red-100 text-red-800';
+                    break;
+                case 'retrying':
+                    color = 'bg-yellow-100 text-yellow-800';
+                    break;
+                default:
+                    color = 'bg-purple-100 text-purple-800';
             }
-            
-            try {
-                // Now submit the job with the correctly parsed payload object
-                const response = await fetch('/jobs/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        job_type: jobType,
-                        payload: payloadObject // This is now a JSON object, satisfying Pydantic
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    statusMessage.className = 'mt-4 text-center font-medium text-green-600';
-                    statusMessage.textContent = `Job queued successfully! ID: ${data.job_id} - Status: ${data.status}`;
-                } else {
-                    // Improved error handling to show server-side error details
-                    statusMessage.className = 'mt-4 text-center font-medium text-red-600';
-                    
-                    let errorMessage = 'Submission failed.';
-                    if (data.detail && Array.isArray(data.detail)) {
-                        // FastAPI 422 errors structure details as an array of objects
-                        errorMessage = `Submission failed: ${data.detail[0].msg} at ${data.detail[0].loc.join('.')}`;
-                    } else if (data.detail) {
-                        errorMessage = `Submission failed: ${data.detail}`;
-                    } else if (data.error) {
-                        errorMessage = `Submission failed: ${data.error}`;
-                    }
-                    statusMessage.textContent = errorMessage;
-                }
-            } catch (error) {
-                statusMessage.className = 'mt-4 text-center font-medium text-red-600';
-                statusMessage.textContent = `Network error: ${error.message}`;
-            }
-            fetchJobs(); // Refresh job list after submission
+            return `<span class="px-3 py-1 text-xs font-semibold rounded-full ${color} capitalize">${status}</span>`;
         }
 
+        /**
+         * Renders the job list data into the HTML table body.
+         * @param {Array<Object>} jobs 
+         */
         function renderJobs(jobs) {
-            const jobList = document.getElementById('jobList');
-            jobList.innerHTML = ''; // Clear existing list
+            const tbody = document.getElementById('jobListBody');
+            tbody.innerHTML = ''; // Clear existing rows
 
-            // Sort by ID descending (most recent first)
+            // The calling function fetchJobs now ensures 'jobs' is a valid array, 
+            // so we can safely check its length here.
+            if (jobs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No jobs found. Submit one above!</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Sort jobs by ID descending (newest first)
             jobs.sort((a, b) => b.id - a.id);
 
             jobs.forEach(job => {
-                // Handle status mapping slightly differently from SQL model's 'queued'
-                const statusKey = job.status === 'queued' ? 'queued' : job.status;
-                const statusClass = statusColors[statusKey] || 'bg-gray-100 text-gray-800';
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-indigo-50 transition duration-100';
                 
-                let resultDisplay = job.result ? JSON.stringify(job.result, null, 2) : 'N/A';
-                if (job.status === 'failed' && job.error_message) {
-                    // If failed, show the error message. Use job.error_message directly.
-                    try {
-                         // Attempt to pretty print if error_message is JSON, otherwise just use the string
-                        resultDisplay = JSON.stringify(job.error_message, null, 2); 
-                    } catch (e) {
-                         resultDisplay = String(job.error_message);
-                    }
-                }
+                const createdDate = new Date(job.created_at).toLocaleString();
 
-                const jobElement = document.createElement('div');
-                jobElement.className = 'p-4 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition duration-150';
-                jobElement.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-lg font-bold text-gray-900">Job ID: ${job.id}</span>
-                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass} uppercase tracking-wider">
-                            ${job.status}
-                        </span>
-                    </div>
-                    <p class="text-sm text-gray-600 mb-1">Type: <span class="font-medium text-gray-700">${job.job_type}</span></p>
-                    <p class="text-sm text-gray-600 mb-1">Retries: <span class="font-medium text-gray-700">${job.retries || 0}</span></p>
-                    <div class="mt-2">
-                        <p class="text-sm font-medium text-gray-700 mb-1">Result / Error:</p>
-                        <pre class="bg-gray-50 p-2 rounded-md text-xs overflow-x-auto text-gray-700">${resultDisplay}</pre>
-                    </div>
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${job.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${job.type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        ${getStatusBadge(job.status)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${createdDate}</td>
                 `;
-                jobList.appendChild(jobElement);
+                tbody.appendChild(row);
             });
         }
 
+        // --- Fetch and Polling Logic ---
+
+        let isFetching = false;
+
+        /**
+         * Fetches the current list of jobs from the API and updates the dashboard.
+         */
         async function fetchJobs() {
+            if (isFetching) return;
+            isFetching = true;
+
             try {
-                // FIX: Change to '/jobs/' to prevent the 307 Temporary Redirect loop
                 const response = await fetch('/jobs/');
-                if (response.ok) {
-                    const jobs = await response.json();
-                    renderJobs(jobs);
-                } else {
-                    console.error("Failed to fetch jobs:", response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                
+                const data = await response.json();
+                let jobsArray = null;
+
+                // --- FIX: Handle both wrapped ({jobs: [...]}) and unwrapped ([...]) responses ---
+                if (data && Array.isArray(data.jobs)) {
+                    jobsArray = data.jobs;
+                } else if (Array.isArray(data)) {
+                    jobsArray = data; // API returned the array directly
+                }
+                // --- END FIX ---
+
+                if (jobsArray !== null) {
+                    renderJobs(jobsArray);
+                } else {
+                    console.error("API response structure error: Expected {jobs: Array} or Array, received:", data);
+                    // Fallback UI update to clearly show a data structure error
+                    const tbody = document.getElementById('jobListBody');
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-sm text-red-500">API response error: Data structure invalid. (Check console)</td>
+                        </tr>
+                    `;
+                }
+
             } catch (error) {
-                console.error("Network error while fetching jobs:", error);
+                console.error("Failed to fetch jobs:", error);
+                const tbody = document.getElementById('jobListBody');
+                
+                // Use error.toString() to capture specific network errors like 'TypeError: Failed to fetch'
+                const errorMessage = error.toString(); 
+
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-sm text-red-500">Error fetching jobs: ${errorMessage}</td>
+                    </tr>
+                `;
+            } finally {
+                isFetching = false;
             }
         }
 
-        // Fetch jobs immediately and then poll every 5 seconds for real-time updates
-        fetchJobs();
-        setInterval(fetchJobs, 5000); 
+        // Initialize polling: fetches jobs every 2 seconds
+        setInterval(fetchJobs, 2000); 
+        // Initial fetch right away
+        fetchJobs(); 
+
+
+        // --- Job Submission Handler ---
+
+        const messageElement = document.getElementById('message');
+        const messageContent = document.getElementById('messageContent');
+        const dismissButton = document.getElementById('dismissMessage');
+
+        // Function to hide the message box
+        const hideMessage = () => messageElement.classList.add('hidden');
+
+        // Attach click handler to dismiss button
+        dismissButton.addEventListener('click', hideMessage);
+
+        document.getElementById('submitJobForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const jobType = document.getElementById('jobType').value;
+            const payloadText = document.getElementById('payload').value;
+            
+
+            try {
+                // Parse payload string into JSON object
+                const payload = JSON.parse(payloadText);
+
+                const response = await fetch('/jobs/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        job_type: jobType,
+                        payload: payload
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.status === 201) {
+                    messageContent.textContent = `Success! Job ${result.job_id} (${jobType}) queued. Click (X) to dismiss.`;
+                    messageElement.className = 'mt-4 p-3 rounded-lg text-sm bg-green-100 text-green-800';
+                    document.getElementById('payload').value = '{"input_data": 100}'; // Reset payload
+                    fetchJobs(); // Force a refresh after submission
+                    
+                    // Hide the message after 5 seconds automatically
+                    setTimeout(hideMessage, 5000); 
+
+                } else {
+                    messageContent.textContent = `Error: ${result.detail || 'Could not submit job.'}`;
+                    messageElement.className = 'mt-4 p-3 rounded-lg text-sm bg-red-100 text-red-800';
+                }
+
+            } catch (error) {
+                console.error('Submission failed:', error);
+                messageContent.textContent = 'Submission Failed: Invalid JSON payload or network error.';
+                messageElement.className = 'mt-4 p-3 rounded-lg text-sm bg-red-100 text-red-800';
+            } finally {
+                messageElement.classList.remove('hidden');
+            }
+        });
     </script>
 </body>
 </html>
