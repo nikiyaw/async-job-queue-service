@@ -5,6 +5,7 @@ import time
 from unittest.mock import patch
 from sqlalchemy.orm import Session
 from src.api.models.sql_models.job import Job as JobModel
+from src.api.models.job import JobStatus
 
 
 def test_read_root(client: TestClient):
@@ -19,6 +20,7 @@ def test_read_root(client: TestClient):
 def test_submit_job(client: TestClient):
     """
     Tests submitting a new job and receiving a valid response with a 201 status code.
+    FIXED: The expected response now correctly includes the 'status': 'queued' field.
     """
     job_payload = {
         "job_type": "send_email",
@@ -33,7 +35,9 @@ def test_submit_job(client: TestClient):
     expected_response = {
         "message": "Job received successfully",
         "job_id": response.json()["job_id"], # Get the dynamically generated job ID from the response
-        "job_type": "send_email"
+        "job_type": "send_email",
+        # FIXED: This assertion now includes the 'status' field using the enum value.
+        "status": JobStatus.QUEUED.value
     }
     assert response.json() == expected_response
 
@@ -61,7 +65,7 @@ def test_job_status(client: TestClient, db_session: Session):
 
     status_response_completed = client.get(f"/jobs/status/{job_id}")
     assert status_response_completed.status_code == 200
-    assert status_response_completed.json()["status"] == "completed"
+    assert status_response_completed.json()["status"] == JobStatus.COMPLETED.value
 
 def test_job_not_found(client: TestClient):
     """
