@@ -7,15 +7,55 @@ services:
       POSTGRES_USER: user 
       POSTGRES_PASSWORD: password 
     volumes:
+      # Persists data to a local volume so data is not lost when the container stops
       - db_data:/var/lib/postgresql/data
+    # Maps the internal container port 5432 to the host port 5433
     ports:
       - "5433:5432"
 
   redis:
     image: redis:6-alpine
     restart: always
+    # Maps the internal container port 6379 to the host port 6379
     ports:
       - "6379:6379"
+
+  api:
+    # Instructs Docker Compose to build the image using the Dockerfile in the current directory
+    build: .
+    restart: always
+    # Maps container port 8000 to your local machine's port 8000 (for dashboard access)
+    ports:
+      - "8000:8000"
+    environment:
+      # Connection URL for the database (PostgreSQL service named 'db')
+      DATABASE_URL: postgresql://user:password@db:5432/jobs_db
+      # Broker URL for Celery (Redis service named 'redis')
+      CELERY_BROKER_URL: redis://redis:6379/0
+      # FIX: Explicitly set the result backend to the 'redis' service for status retrieval.
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    # Ensures the database and redis are running before the API attempts to connect
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    # Use the same image built for the API service
+    build: .
+    restart: always
+    # This command overrides the default 'CMD' in the Dockerfile, explicitly starting the Celery worker
+    command: celery -A src.worker.celery_worker worker --loglevel=info --pool=solo --queues=job_queue
+    environment:
+      # Set environment variables for the worker as well
+      DATABASE_URL: postgresql://user:password@db:5432/jobs_db
+      CELERY_BROKER_URL: redis://redis:6379/0
+      # CRITICAL FIX: The worker must know where the result backend is, using the service name 'redis'.
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    # Ensures the broker and database are running before the worker starts
+    depends_on:
+      - db
+      - redis
   
 volumes:
+  # Define the volume used to persist the PostgreSQL data
   db_data:
