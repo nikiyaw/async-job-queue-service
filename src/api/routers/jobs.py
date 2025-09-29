@@ -1,20 +1,20 @@
-import logging
-from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from ..core.database import get_db
-from ..models.sql_models.job import Job as JobModel # This is the SQLAlchemy model (database)
-# Import Celery app for task submission
-from ...worker.celery_worker import celery_app
-# Import updated Pydantic schemas (JobCreate, JobSubmitResponse, JobStatusResponse)
+from typing import List
+from starlette.concurrency import run_in_threadpool
+
 from src.api.models.job import (
     JobCreate,
     JobSubmitResponse,
     JobStatus,
     JobStatusResponse,
 )
+from ..models.sql_models.job import Job as JobModel
+from ..core.database import get_db
+from ...worker.celery_worker import celery_app
 
-# NEW: Initialize logger for this module
+import logging
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -22,45 +22,57 @@ router = APIRouter(
     tags=["jobs"]
 )
 
-@router.post("/submit", response_model=JobSubmitResponse, status_code=status.HTTP_201_CREATED)
-def submit_job(job_data: JobCreate, db: Session = Depends(get_db)):
+# --- CONVERTED TO ASYNC ---
+@router.post(
+    "/submit", 
+    response_model=JobSubmitResponse, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit a new job for asynchronous processing" # Added documentation summary
+)
+async def submit_job(job_data: JobCreate, db: Session = Depends(get_db)):
     """
-    Submits a new job to the queue, saves its initial state to the database, 
-    and sends the task to Celery.
+    Creates a new job entry in the database and queues it for processing by the worker 
+    in a separate thread to maintain non-blocking API performance.
     """
-    # 1. Save job to database (initial state)
-    new_job = JobModel(
-        job_type=job_data.job_type,
-        payload=job_data.payload,
-        status=JobStatus.QUEUED.value # Explicitly set initial status to "queued"
-    )
-
-    # Add the job to the session and commit it to the database
-    db.add(new_job)
-    db.commit()
-    db.refresh(new_job) # To get the newly created ID
-
-    # 2. Send task to Celery
-    try:
-        # We pass the newly created database job ID, NOT the Celery task ID, 
-        # as the database ID is our source of truth.
-        celery_app.send_task(
-            "src.worker.celery_worker.process_job",
-            args=[new_job.id],
-            queue="job_queue"
+    
+    # Define a synchronous function to handle all blocking DB and Celery operations
+    def submit_job_sync(db: Session, job_data: JobCreate):
+        # 1. Save job to database (initial state)
+        new_job = JobModel(
+            job_type=job_data.job_type,
+            payload=job_data.payload,
+            status=JobStatus.QUEUED.value # Explicitly set initial status to "queued"
         )
-        logger.info(f"API received job {new_job.id} (type: {new_job.job_type}) and queued it for processing.")
-    except Exception as e:
-        # If Celery is unreachable, log the error and mark the the job as failed immediately. 
-        logger.error(f"Failed to queue job {new_job.id} to Celery: {e}")
-        new_job.status = JobStatus.FAILED.value
-        new_job.erro_message = f"Celery connection error: {str(e)}"
+
+        db.add(new_job)
         db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Job saved but failed to queue to worker. Error: {str(e)}"
-        )
+        db.refresh(new_job) # To get the newly created ID
 
+        # 2. Send task to Celery
+        try:
+            celery_app.send_task(
+                "src.worker.celery_worker.process_job",
+                args=[new_job.id],
+                queue="job_queue"
+            )
+            logger.info(f"API received job {new_job.id} (type: {new_job.job_type}) and queued it for processing.")
+        except Exception as e:
+            # If Celery is unreachable, log the error and mark the the job as failed immediately. 
+            logger.error(f"Failed to queue job {new_job.id} to Celery: {e}")
+            # Note: Typo fixed here: `erro_message` -> `error_message`
+            new_job.status = JobStatus.FAILED.value
+            new_job.error_message = {"error": "Celery Connection Error", "details": str(e)}
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Job saved but failed to queue to worker. Error: {str(e)}"
+            )
+        
+        return new_job
+
+    # Execute the blocking database and Celery logic in a separate thread
+    new_job = await run_in_threadpool(submit_job_sync, db, job_data)
+    
     return JobSubmitResponse(
         message="Job received successfully", 
         job_id=new_job.id, 
@@ -69,15 +81,24 @@ def submit_job(job_data: JobCreate, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/status/{job_id}", response_model=JobStatusResponse)
-def get_job_status(job_id: int, db: Session = Depends(get_db)):
+# --- CONVERTED TO ASYNC ---
+@router.get(
+    "/status/{job_id}", 
+    response_model=JobStatusResponse,
+    summary="Get the current status and final result of a specific job" # Added documentation summary
+)
+async def get_job_status(job_id: int, db: Session = Depends(get_db)):
     """
-    Retrieves the current status, result, and error message for a specific job ID.
+    Retrieves the current status, result, and error message for a specific job ID 
+    by accessing the database in a non-blocking manner.
+    """
     
-    CRITICAL CHANGE: response_model is now JobStatusResponse, which includes 
-    result and error_message fields.
-    """
-    job = db.query(JobModel).filter(JobModel.id == job_id).first()
+    # Define a synchronous function to handle the blocking DB query
+    def get_job_sync(db: Session, job_id: int):
+        return db.query(JobModel).filter(JobModel.id == job_id).first()
+
+    # Execute the blocking query in a separate thread
+    job = await run_in_threadpool(get_job_sync, db, job_id)
 
     if not job:
         logger.warning(f"Job with ID {job_id} not found.")
@@ -86,21 +107,27 @@ def get_job_status(job_id: int, db: Session = Depends(get_db)):
             detail=f"Job with ID {job_id} not found."
         )
     
-    # Because JobStatusResponse has `from_attributes = True`, FastAPI automatically 
-    # maps the SQLAlchemy `job` object's attributes (including result/error_message) 
-    # to the Pydantic response model.
     return job
 
 
-@router.get("/", response_model=List[JobStatusResponse])
-def get_all_jobs(db: Session = Depends(get_db)):
+# --- CONVERTED TO ASYNC ---
+@router.get(
+    "/", 
+    response_model=List[JobStatusResponse],
+    summary="Get a list of the 50 most recent jobs" # Added documentation summary
+)
+async def get_all_jobs(db: Session = Depends(get_db)):
     """
-    Retrieves a list of all jobs, used to power the dashboard feed.
+    Retrieves a list of the 50 most recent jobs, used to power the dashboard feed, 
+    running the query in a separate thread.
+    """
     
-    CRITICAL CHANGE: response_model is now List[JobStatusResponse], ensuring all 
-    jobs in the list correctly include the result and error_message fields.
-    """
-    # Query all jobs, ordered by descending ID (most recent first)
-    jobs = db.query(JobModel).order_by(JobModel.id.desc()).all()
-    # FastAPI automatically handles the serialization of the list of SQLAlchemy objects
+    # Define a synchronous function to handle the blocking DB query
+    def get_all_jobs_sync(db: Session):
+        # We limit the results to 50 for dashboard performance
+        return db.query(JobModel).order_by(JobModel.id.desc()).limit(50).all() 
+
+    # Execute the blocking query in a separate thread
+    jobs = await run_in_threadpool(get_all_jobs_sync, db)
+    
     return jobs
