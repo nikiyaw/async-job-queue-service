@@ -11,7 +11,7 @@ from src.api.models.job import (
 )
 from ..models.sql_models.job import Job as JobModel
 from ..core.database import get_db
-from ...worker.celery_worker import celery_app
+from ..core.celery_app import celery_app
 
 import logging
 
