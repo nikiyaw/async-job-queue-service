@@ -1,11 +1,18 @@
 import logging
-from fastapi import APIRouter, status, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from ..models.job import JobSubmission # This is the Pydantic model
-from ..core.database import get_db # This is the database dependency
-from ..models.sql_models.job import Job as JobModel # This is the SQLAlchemy model
+from ..core.database import get_db
+from ..models.sql_models.job import Job as JobModel # This is the SQLAlchemy model (database)
+# Import Celery app for task submission
 from ...worker.celery_worker import celery_app
-
+# Import updated Pydantic schemas (JobCreate, JobSubmitResponse, JobStatusResponse)
+from src.api.models.job import (
+    JobCreate,
+    JobSubmitResponse,
+    JobStatus,
+    JobStatusResponse,
+)
 
 # NEW: Initialize logger for this module
 logger = logging.getLogger(__name__)
@@ -15,81 +22,85 @@ router = APIRouter(
     tags=["jobs"]
 )
 
-@router.post("/submit", status_code=status.HTTP_201_CREATED)
-def submit_job(job: JobSubmission, db: Session = Depends(get_db)):
-    # Create a new Job instance from the Pydantic model
-    db_job = JobModel(
-        job_type=job.job_type,
-        payload=job.payload,
-        status="queued"
+@router.post("/submit", response_model=JobSubmitResponse, status_code=status.HTTP_201_CREATED)
+def submit_job(job_data: JobCreate, db: Session = Depends(get_db)):
+    """
+    Submits a new job to the queue, saves its initial state to the database, 
+    and sends the task to Celery.
+    """
+    # 1. Save job to database (initial state)
+    new_job = JobModel(
+        job_type=job_data.job_type,
+        payload=job_data.payload,
+        status=JobStatus.QUEUED.value # Explicitly set initial status to "queued"
     )
 
     # Add the job to the session and commit it to the database
-    db.add(db_job)
+    db.add(new_job)
     db.commit()
-    db.refresh(db_job) # To get the newly created ID
+    db.refresh(new_job) # To get the newly created ID
 
-    # Add the job to the Celery queue by using a task from Celery app directly, which handles serialization
-    task_name = "src.worker.celery_worker.process_job"
-    celery_app.send_task(task_name, args=[db_job.id], queue="job_queue")
+    # 2. Send task to Celery
+    try:
+        # We pass the newly created database job ID, NOT the Celery task ID, 
+        # as the database ID is our source of truth.
+        celery_app.send_task(
+            "src.worker.celery_worker.process_job",
+            args=[new_job.id],
+            queue="job_queue"
+        )
+        logger.info(f"API received job {new_job.id} (type: {new_job.job_type}) and queued it for processing.")
+    except Exception as e:
+        # If Celery is unreachable, log the error and mark the the job as failed immediately. 
+        logger.error(f"Failed to queue job {new_job.id} to Celery: {e}")
+        new_job.status = JobStatus.FAILED.value
+        new_job.erro_message = f"Celery connection error: {str(e)}"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Job saved but failed to queue to worker. Error: {str(e)}"
+        )
 
-    logger.info(f"API received job {db_job.id} (type: {db_job.job_type}) and queued it for processing.")
+    return JobSubmitResponse(
+        message="Job received successfully", 
+        job_id=new_job.id, 
+        job_type=new_job.job_type, 
+        status=JobStatus.QUEUED.value
+    )
 
-    return {"message": "Job received successfully", "job_id": db_job.id, "job_type": db_job.job_type, "status": db_job.status}
 
-# NEW ROUTE: Handles GET /jobs/ which fetches all jobs for the dashboard list
-@router.get("/", status_code=status.HTTP_200_OK)
+@router.get("/status/{job_id}", response_model=JobStatusResponse)
+def get_job_status(job_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieves the current status, result, and error message for a specific job ID.
+    
+    CRITICAL CHANGE: response_model is now JobStatusResponse, which includes 
+    result and error_message fields.
+    """
+    job = db.query(JobModel).filter(JobModel.id == job_id).first()
+
+    if not job:
+        logger.warning(f"Job with ID {job_id} not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job with ID {job_id} not found."
+        )
+    
+    # Because JobStatusResponse has `from_attributes = True`, FastAPI automatically 
+    # maps the SQLAlchemy `job` object's attributes (including result/error_message) 
+    # to the Pydantic response model.
+    return job
+
+
+@router.get("/", response_model=List[JobStatusResponse])
 def get_all_jobs(db: Session = Depends(get_db)):
     """
-    Retrieves a list of all jobs from the database, ordered by ID descending.
+    Retrieves a list of all jobs, used to power the dashboard feed.
+    
+    CRITICAL CHANGE: response_model is now List[JobStatusResponse], ensuring all 
+    jobs in the list correctly include the result and error_message fields.
     """
     # Query all jobs, ordered by descending ID (most recent first)
     jobs = db.query(JobModel).order_by(JobModel.id.desc()).all()
     # FastAPI automatically handles the serialization of the list of SQLAlchemy objects
     return jobs
-
-@router.get("/status/{job_id}", status_code=status.HTTP_200_OK)
-def get_job_status(job_id: int, db: Session = Depends(get_db)):
-    """
-    Retrieves the status of a job from the database.
-    """
-    job = db.query(JobModel).filter(JobModel.id == job_id).first()
-
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job with ID {job_id} not found."
-        )
-    
-    # If the job failed, include the error message in the response
-    if job.status == "failed":
-        return {"job_id": job.id, "status": job.status, "error_message": job.error_message}
-    
-    # Otherwise, just return the status
-    return {"job_id": job.id, "status": job.status}
-
-@router.get("/{job_id}/result", status_code=status.HTTP_200_OK)
-def get_job_result(job_id: int, db: Session = Depends(get_db)):
-    """
-    Retrieves the result of a completed job from the database.
-    """
-    logger.debug(f"API checking result for job ID: {job_id}")
-
-    job = db.query(JobModel).filter(JobModel.id == job_id).first()
-
-    if not job:
-        logger.warning(f"Result check failed: Job ID {job_id} not found.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job with ID {job_id} not found."
-        )
-    
-    # Check if the job has been completed
-    if job.status != "completed":
-        logger.info(f"Result requested for job {job_id}, but status is still '{job.status}.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Job {job_id} is still in status '{job.status}'. The result is not yet available."
-        )
-    
-    return {"job_id": job.id, "result": job.result}
