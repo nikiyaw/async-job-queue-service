@@ -1,9 +1,9 @@
 import redis
 import os
 
-# We will use an environment variable for the Redis URL in a more advanced setup.
-# For now, we'll hardcode it to match our docker-compose file.
-REDIS_URL = "redis://localhost:6379"
+# Prefer a specifically named REDIS_URL env var; fallback to CELERY_BROKER_URL if present,
+# and to the Docker default 'redis' host if nothing is set.
+REDIS_URL = os.environ.get("REDIS_URL", os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0"))
 
 # Create the Redis client
 redis_client = redis.from_url(REDIS_URL)
