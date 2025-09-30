@@ -1,5 +1,8 @@
+import os
 import time
 import random
+from typing import Any, Dict, Optional, Tuple
+from celery import Task
 
 from ..api.core.celery_app import celery_app
 from ..api.core.database import SessionLocal
@@ -14,12 +17,20 @@ setup_logging(
 )
 logger = get_logger(__name__)
 
-def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
+
+def update_job_status_on_failure(
+        task: Task,
+        exc: BaseException, 
+        task_id: str, 
+        args: Tuple[Any, ...], 
+        kwargs: Dict[str, Any],
+        einfo: Any
+        ) -> None:
     """
-    This failure handler runs when a task permanently fails (all retries exhausted).
-    It updates the job status in the database to 'failed'.
+    Failure handler that runs when a task permanently fails.
+    Updates the job status in the database to 'failed'.
     """
-    job_id = args[0] if args else None
+    job_id: Optional[int] = args[0] if args else None
     logger.error(f"Job {job_id} permanently failed after retries.", exc_info=True)
 
     if job_id is None:
@@ -43,8 +54,11 @@ def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
                 exc_info=True
             )
 
+
 @celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3})
-def process_job(self, job_id: int):
+def process_job(
+    self: Task,
+    job_id: int) -> None:
     """
     Processes a job (simulated). Supports retries and updates job status accordingly.
     """
@@ -59,12 +73,12 @@ def process_job(self, job_id: int):
                 raise ValueError(f"Job with ID {job_id} not found in database.")
             
             raw_job_type = (job.job_type or "").strip()
-            jt = raw_job_type.lower()
+            jt: str = raw_job_type.lower()
 
             job.status = "processing" if not is_retry else "retrying"
             logger.info(f"Job {job_id} status set to '{job.status}'.")
 
-            final_result = None
+            final_result: Optional[Dict[str, Any]] = None
 
             # Main job logic simulation
             if "email" in jt or "send" in jt:

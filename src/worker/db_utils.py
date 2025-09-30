@@ -6,9 +6,14 @@ from src.api.core.logging_config import get_logger
 logger = get_logger(__name__)
 
 @contextmanager
-def get_db_session():
+def get_db_session() -> Session:
     """ 
-    Provides a database session inside a context manager. Ensures the session is committed if successful, or rolled back on error, and always closed at the end. 
+    Provides a database session inside a context manager.
+    Ensures the session is committed if successful, rolled back on error,
+    and always closed at the end.
+    
+    Yields:
+        Session: SQLAlchemy Session object for database operations.
     """
     db = SessionLocal()
     try:
@@ -18,7 +23,7 @@ def get_db_session():
     except Exception as e:
         db.rollback()
         logger.exception(f"Error during DB session, rolled back: {e}")
-        raise e
+        raise
     finally: 
         db.close()
         logger.debug("Database session closed.")
