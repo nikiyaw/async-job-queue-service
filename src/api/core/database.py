@@ -1,5 +1,6 @@
+from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from .settings import settings
 from .logging_config import get_logger
 
@@ -15,9 +16,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base class for models
 Base = declarative_base()
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """ 
-    Dependency for FastAPI routes. Provides a database session and ensures it is properly closed after use. 
+    Dependency for FastAPI routes. 
+    Provides a database session and ensures it is properly closed after use. 
     """
     db = SessionLocal()
     try:
