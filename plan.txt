@@ -152,3 +152,32 @@ Week 3: Job Retries & Database Synchronization
 - Goal: Implement a robust, non-default retry mechanism for the Celery worker and ensure the database schema is correctly synchronized with the application logic.
 - Key Concepts Learned: We dived deep into building a more resilient system. We learned how to customize Celery's retry mechanism using the @celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3}) decorator. This allowed us to override the default exponential backoff with a specific 10-second delay using raise self.retry(exc=e, countdown=10). We also learned the crucial concept of database schema synchronization, understanding how SQLAlchemy's Base.metadata.create_all() can be used to automatically create database tables and ENUM types based on our Python models.
 - Problems & Fixes: The primary challenge was a persistent DataError (invalid input value for enum job_status: "retrying") and a LookupError. We discovered that the root cause was a mismatch between our Celery worker's code, which attempted to set a "retrying" status, and our database schema, which did not include this value. Initially, we attempted to fix this with manual SQL commands to alter the job_status ENUM in the PostgreSQL shell. While this worked temporarily, the issue reappeared when the database was reset. The ultimate, long-term fix was a two-step process: first, we updated the Job model in our code to include "retrying" in the Enum definition. Second, we moved the Base.metadata.create_all() call from the main file's top level into a FastAPI startup event handler. This ensures the database schema is always correctly created on application startup, solving the synchronization problem permanently.
+
+Quick Wins
+1. Centralized settings module ✅ Done
+-We created settings.py with pydantic-settings.
+-Updated database.py and redis_config.py to use settings.
+
+2. Shared Celery app ✅ Done
+-Centralized celery_app.py.
+-Updated celery_worker.py and routers/jobs.py to use the same instance.
+
+3. Logging improvements 🟡 Next
+-Standardize logging format across API and worker.
+-Use structured logs, include timestamps, module names, and log levels.
+
+4. Typing improvements
+-Add type hints to functions, especially Celery tasks and DB utilities.
+-Improves IDE help and readability.
+
+5. Cleaner template JS
+-Move inline JS from index.html to /static/js/app.js.
+-Keeps HTML lean and maintainable.
+
+6. Use response models consistently in FastAPI
+-Ensure all endpoints return Pydantic models instead of raw dicts or ORM objects.
+-We did a lot of this already, but a final review can polish any missed ones.
+
+7. Unit test coverage of failures
+-Add tests for edge cases: invalid payload, worker error, retries exceeded.
+-Catch regressions early.

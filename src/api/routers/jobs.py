@@ -13,9 +13,10 @@ from ..models.sql_models.job import Job as JobModel
 from ..core.database import get_db
 from ..core.celery_app import celery_app
 
-import logging
+from ..core.logging_config import get_logger, setup_logging
 
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/jobs",

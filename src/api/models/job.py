@@ -17,7 +17,7 @@ class JobStatus(str, Enum):
 class JobBase(BaseModel):
     job_type: str = Field(..., example="Data Analysis")
     # Using Dict[str, Any] allows for any valid JSON structure in the payload
-    payload: Dict[str, Any] = Field(..., example={"input_data": 100})
+    payload: Optional[Dict[str, Any]] = Field(default_factory=dict, example={"input_data": 100})
 
 
 class JobCreate(JobBase):

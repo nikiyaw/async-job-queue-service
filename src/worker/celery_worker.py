@@ -1,14 +1,15 @@
 import time
 import random
-import logging
 
 from ..api.core.celery_app import celery_app
 from ..api.core.database import SessionLocal
+from ..api.core.logging_config import setup_logging, get_logger
 from ..api.models.sql_models.job import Job as JobModel
 from .db_utils import get_db_session
 
-# Set up logging for the worker
-logger = logging.getLogger(__name__)
+# Setup logging for worker process
+setup_logging()
+logger = get_logger(__name__)
 
 def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):
     """

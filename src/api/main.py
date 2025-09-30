@@ -1,17 +1,16 @@
 import os
-import logging
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from .routers import jobs
 from .core.database import Base, engine
+from .core.logging_config import setup_logging, get_logger
 from .models.sql_models import job
 
-# --- NEW: Logging Setup ---
-# 1. We configure the standard logging format for all application logs.
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(name)s] - %(message)s')
-logger = logging.getLogger(__name__)
+# Setup global logging
+setup_logging()
+logger = get_logger(__name__)
 
 app = FastAPI(
     title="Job Queue Service",
@@ -27,9 +26,9 @@ app.mount("/static", StaticFiles(directory="src/api/static"), name="static")
 # tables are created only once when the application starts.
 @app.on_event("startup")
 async def startup_event():
-    logging.info("Connecting to database and creating tables...")
+    logger.info("Connecting to database and creating tables...")
     Base.metadata.create_all(bind=engine)
-    logging.info("Database tables created or already exist.")
+    logger.info("Database tables created or already exist.")
 
 @app.get("/")
 def serve_dashboard():
