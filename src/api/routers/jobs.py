@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from starlette.concurrency import run_in_threadpool
 
 from src.api.models.job import (
@@ -28,7 +28,11 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Submit a new job for asynchronous processing" 
 )
-async def submit_job(job_data: JobCreate, db: Session = Depends(get_db), request: Request = None):
+async def submit_job(
+    job_data: JobCreate, 
+    db: Session = Depends(get_db), 
+    request: Optional[Request] = None
+    ) -> JobSubmitResponse:
     """ 
     Creates a new job entry in the database and queues it for processing by the worker. 
     """
@@ -36,7 +40,10 @@ async def submit_job(job_data: JobCreate, db: Session = Depends(get_db), request
     client_host = request.client.host if request else "unknown"
     logger.info(f"Received new job submission request from {client_host}: type={job_data.job_type}")
 
-    def submit_job_sync(db: Session, job_data: JobCreate):
+    def submit_job_sync(
+        db: Session, 
+        job_data: JobCreate
+        ) -> JobModel:
         new_job = JobModel(
             job_type=job_data.job_type,
             payload=job_data.payload,
@@ -66,7 +73,7 @@ async def submit_job(job_data: JobCreate, db: Session = Depends(get_db), request
         
         return new_job
     
-    new_job = await run_in_threadpool(submit_job_sync, db, job_data)
+    new_job: JobModel = await run_in_threadpool(submit_job_sync, db, job_data)
     return JobSubmitResponse(
         message="Job received successfully", 
         job_id=new_job.id, 
@@ -80,15 +87,18 @@ async def submit_job(job_data: JobCreate, db: Session = Depends(get_db), request
     response_model=JobStatusResponse,
     summary="Get the current status and final result of a specific job" 
 )
-async def get_job_status(job_id: int, db: Session = Depends(get_db)):
+async def get_job_status(
+    job_id: int, 
+    db: Session = Depends(get_db)
+    ) -> JobStatusResponse:
     """ 
     Retrieves the current status of a job. 
     """
     
-    def get_job_sync(db: Session, job_id: int):
+    def get_job_sync(db: Session, job_id: int) -> Optional[JobModel]:
         return db.query(JobModel).filter(JobModel.id == job_id).first()
 
-    job = await run_in_threadpool(get_job_sync, db, job_id)
+    job: Optional[JobModel] = await run_in_threadpool(get_job_sync, db, job_id)
 
     if not job:
         logger.warning(f"Job with ID {job_id} not found.")
@@ -106,14 +116,16 @@ async def get_job_status(job_id: int, db: Session = Depends(get_db)):
     response_model=List[JobStatusResponse],
     summary="Get a list of the 50 most recent jobs"
 )
-async def get_all_jobs(db: Session = Depends(get_db)):
+async def get_all_jobs(
+    db: Session = Depends(get_db)
+    ) -> List[JobStatusResponse]:
     """
     Retrieves a list of the 50 most recent jobs.
     """
     
-    def get_all_jobs_sync(db: Session):
+    def get_all_jobs_sync(db: Session) -> List[JobModel]:
         return db.query(JobModel).order_by(JobModel.id.desc()).limit(50).all() 
 
-    jobs = await run_in_threadpool(get_all_jobs_sync, db)
+    jobs: List[JobModel] = await run_in_threadpool(get_all_jobs_sync, db)
     logger.info(f"Fetched {len(jobs)} recent jobs for dashboard.")
     return jobs
