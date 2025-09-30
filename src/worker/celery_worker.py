@@ -8,7 +8,10 @@ from ..api.models.sql_models.job import Job as JobModel
 from .db_utils import get_db_session
 
 # Setup logging for worker process
-setup_logging()
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    json_logs=os.getenv("JSON_LOGS", "false").lower() == "true"
+)
 logger = get_logger(__name__)
 
 def update_job_status_on_failure(task, exc, task_id, args, kwargs, einfo):

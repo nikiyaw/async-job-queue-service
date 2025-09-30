@@ -9,7 +9,10 @@ from .core.logging_config import setup_logging, get_logger
 from .models.sql_models import job
 
 # Setup global logging
-setup_logging()
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    json_logs=os.getenv("JSON_LOGS", "false").lower() == "true"
+)
 logger = get_logger(__name__)
 
 app = FastAPI(
