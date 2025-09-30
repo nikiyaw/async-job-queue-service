@@ -31,7 +31,7 @@ router = APIRouter(
 async def submit_job(
     job_data: JobCreate, 
     db: Session = Depends(get_db), 
-    request: Optional[Request] = None
+    request: Request =None
     ) -> JobSubmitResponse:
     """ 
     Creates a new job entry in the database and queues it for processing by the worker. 
