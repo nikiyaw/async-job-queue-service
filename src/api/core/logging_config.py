@@ -1,20 +1,20 @@
 import logging
-from logging import StreamHandler
+from logging import StreamHandler, Logger
 import sys
 import os
+from typing import Optional
 
 try:
     from pythonjsonlogger import jsonlogger
 except ImportError:
     jsonlogger = None
 
-def setup_logging(level: str = "INFO", json_logs: bool = False):
+def setup_logging(level: str = "INFO", json_logs: bool = False) -> None:
     """
     Configures global logging format, level, and handler.
     If json_logs=True, uses JSON formatter (requires python-json-logger).
     """
 
-    # Root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level.upper())
 
@@ -40,7 +40,7 @@ def setup_logging(level: str = "INFO", json_logs: bool = False):
     root_logger.addHandler(handler)
 
 
-def get_logger(name: str):
+def get_logger(name: str) -> Logger:
     """
     Returns a logger with the given module name.
     """
