@@ -1,6 +1,4 @@
 from fastapi.testclient import TestClient
-#from src.api.main import app
-import json
 from unittest.mock import patch
 from sqlalchemy.orm import Session
 from src.api.models.sql_models.job import Job as JobModel
