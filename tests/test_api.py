@@ -44,7 +44,7 @@ def test_retrieve_all_jobs(client: TestClient):
     assert len(jobs) > 0 # At least the job we submitted must be present
 
     # 3. Verify the submitted job's details are in the list
-    found_job = next((job for job in jobs if job['id'] == job_id), None)
+    found_job = next((job for job in jobs if job['job_id'] == job_id), None)
     assert found_job is not None
     assert found_job["job_type"] == "dashboard_check"
     assert found_job["status"] == JobStatus.QUEUED.value
