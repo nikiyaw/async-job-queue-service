@@ -74,4 +74,15 @@ docker-compose.yml
    - Redis broker
    
 4. Access the dashboard
+   Open your browser at:
+   (http://localhost:8000/)
+
+5. API Documentation
+   Interactive Swagger UI:
+   (http://localhost:8000/docs)
    
+### Development
+1. Run test
+   ```
+   pytest
+   ```
