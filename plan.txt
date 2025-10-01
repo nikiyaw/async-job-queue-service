@@ -166,11 +166,11 @@ Quick Wins
 -Standardize logging format across API and worker.
 -Use structured logs, include timestamps, module names, and log levels.
 
-4. Typing improvements
+4. Typing improvements ✅ Done
 -Add type hints to functions, especially Celery tasks and DB utilities.
 -Improves IDE help and readability.
 
-5. Cleaner template JS
+5. Cleaner template JS ✅ Done
 -Move inline JS from index.html to /static/js/app.js.
 -Keeps HTML lean and maintainable.
 

@@ -1,12 +1,15 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from .routers import jobs
 from .core.database import Base, engine
 from .core.logging_config import setup_logging, get_logger
 from .models.sql_models import job
+
+templates = Jinja2Templates(directory="src/api/templates")
 
 # Setup global logging
 setup_logging(
@@ -34,16 +37,15 @@ async def startup_event():
     logger.info("Database tables created or already exist.")
 
 @app.get("/")
-def serve_dashboard():
+def serve_dashboard(request: Request):
     """
     This new root endpoint serves the main dashboard HTML page.
     It locates 'index.html' inside the 'templates' folder.
     """
     # os.path.dirname(__file__) gets the current directory (src/api)
     # Then we append 'templates/index.html'
-    html_file_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
-    logger.info(f"Serving dashboard from {html_file_path}")
-    return FileResponse(html_file_path, media_type="text/html")
+    return templates.TemplateResponse("index.html", {"request": request})
+
 
 # Include the routers
 app.include_router(jobs.router)

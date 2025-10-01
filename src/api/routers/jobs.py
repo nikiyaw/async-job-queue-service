@@ -32,7 +32,7 @@ router = APIRouter(
 async def submit_job(
     job_data: JobCreate,
     db: Session = Depends(get_db),
-    request: Optional[Request] = None
+    request: Request = None
 ) -> JobSubmitResponse:
     client_host: str = getattr(getattr(request, "client", None), "host", "unknown")
     logger.info(f"Received new job submission request from {client_host}: type={job_data.job_type}")
