@@ -41,7 +41,7 @@ This project demonstrates key backend concepts:
    By default, the app will connect to:
    - postgresql://user:password@db:5432/jobs_db
    - redis://redis:6379/0
-   You can override any of these by creating a .env file in the project root:
+   You can override any of these by creating a .env file in the project root (optional):
    ```
    DATABASE_URL=postgresql://your_user:your_pass@localhost:5432/your_db
    REDIS_URL=redis://localhost:6379/0
@@ -68,7 +68,10 @@ This project demonstrates key backend concepts:
    (http://localhost:8000/docs)
    
 ### Development
-1. Run test
+1. To run test suite locally
    ```
    pytest
    ```
+   
+## License
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
