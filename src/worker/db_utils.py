@@ -1,19 +1,17 @@
-from contextlib import contextmanager 
-from sqlalchemy.orm import Session 
-from src.api.core.database import SessionLocal 
-from src.api.core.logging_config import get_logger 
+from contextlib import contextmanager
+from typing import Generator
+from sqlalchemy.orm import Session
+from src.api.core.database import SessionLocal
+from src.api.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 @contextmanager
-def get_db_session() -> Session:
+def get_db_session() -> Generator[Session, None, None]:
     """ 
     Provides a database session inside a context manager.
     Ensures the session is committed if successful, rolled back on error,
     and always closed at the end.
-    
-    Yields:
-        Session: SQLAlchemy Session object for database operations.
     """
     db = SessionLocal()
     try:
@@ -24,6 +22,6 @@ def get_db_session() -> Session:
         db.rollback()
         logger.exception(f"Error during DB session, rolled back: {e}")
         raise
-    finally: 
+    finally:
         db.close()
         logger.debug("Database session closed.")
