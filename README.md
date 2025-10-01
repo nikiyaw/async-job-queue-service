@@ -1,7 +1,7 @@
 # Asynchronous Job Queue Service
 
 ## Overview
-The Asynchronous Job Queue Service is a backend system for handling long-running or resource-intensive tasks outside the request/response cycle.
+The project is a backend system for handling long-running or resource-intensive tasks outside the request/response cycle.
 It allows users to submit jobs via an API or dashboard, process them asynchronously with Celery workers, and monitor their progress in real time.
 
 This project demonstrates key backend concepts:
