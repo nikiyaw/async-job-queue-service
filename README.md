@@ -30,35 +30,35 @@ This project demonstrates key backend concepts:
 - Testing: **Pytest**
 
 ### Project Structure
-project-root/
-├─ src/
-│  ├─ api/
-│  │  ├─ core/
-│  │  │  ├─ settings.py
-│  │  │  ├─ database.py
-│  │  │  ├─ celery_app.py
-│  │  │  └─ logging_config.py
-│  │  ├─ models/
-│  │  │  ├─ job.py
-│  │  │  └─ sql_models/
-│  │  │     └─ job.py
-│  │  ├─ routers/
-│  │  │  └─ jobs.py
-│  │  ├─ static/
-│  │  │  └─ js/app.js
-│  │  ├─ templates/
-│  │  │  └─ index.html
-│  │  └─ main.py
-│  └─ worker/
-│     ├─ celery_worker.py
-│     └─ db_utils.py
-├─ tests/
-│  ├─ conftest.py
-│  └─ test_api.py
-├─ docker-compose.yml
-├─ Dockerfile
-├─ requirements.txt
-└─ README.md
+- src/
+  - api/
+    - core/
+      - settings.py
+      - database.py
+      - celery_app.py
+      - logging_config.py
+    - models/
+      - job.py
+      - sql_models/
+        - job.py
+    - routers/
+      - jobs.py
+    - static/
+      - js/
+        - app.js
+    - templates/
+      - index.html
+    - main.py
+  - worker/
+    - celery_worker.py
+    - db_utils.py
+- tests/
+  - conftest.py
+  - test_api.py
+- docker-compose.yml
+- Dockerfile
+- requirements.txt
+- README.md
 
 ### Getting Started
 1. Clone the repository
@@ -91,11 +91,11 @@ project-root/
    - Redis broker
    
 4. Access the dashboard
-   Open your browser at:
+   - Open your browser at:
    (http://localhost:8000/)
 
 5. API Documentation
-   Interactive Swagger UI:
+   - Interactive Swagger UI:
    (http://localhost:8000/docs)
    
 ### Development
